@@ -12,16 +12,31 @@
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
+
 
 // global variables
 const unsigned int SCR_WIDTH = 1800;
 const unsigned int SCR_HEIGHT = 1200;
 
-float R = 1.0f;
-float r = 0.3f;
-int meshAcc = 32;
+float SCROLL_SPEED = 0.1f;
+float SCREEN_SCALE = 1.0f;
+float PAN_SPEED = 0.0025f;
 
-bool changesMade = false;
+float ROTATE_SPEED = 0.005f;
+float ROT_X = 0.0f;
+float ROT_Y = 0.0f;
+
+float SHIFT_X = 0.0f;
+float SHIFT_Y = 0.0f;
+
+bool LMB_PRESSED = false;
+bool RMB_PRESSED = false;
+double LAST_MOUSE_X = 0.0;
+double LAST_MOUSE_Y = 0.0;
+
 
 int main()
 {
@@ -44,7 +59,12 @@ int main()
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
+
+    glfwSetScrollCallback(window, scroll_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetCursorPosCallback(window, cursor_position_callback);
     glEnable(GL_DEPTH_TEST);
+    //glEnable(GL_CULL_FACE);
 	// -- END OF BOILERPLATE CODE --
 
 
@@ -63,6 +83,10 @@ int main()
 
 
     // CREATE TORUS
+    float R = 1.0f;
+    float r = 0.3f;
+    int meshAcc = 64;
+    bool changesMade = false;
     pmath::Torus t(R, r, meshAcc, meshAcc);
     unsigned int VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -125,7 +149,7 @@ int main()
 		// Torus setup if changes were made
         if (changesMade)
         {
-            pmath::Torus t(R, r, meshAcc, meshAcc);
+            t = pmath::Torus(R, r, meshAcc, meshAcc);
             glBindVertexArray(VAO);
             glBindBuffer(GL_ARRAY_BUFFER, VBO);
             glBufferData(GL_ARRAY_BUFFER, t.vertices.size() * sizeof(float), t.vertices.data(), GL_STATIC_DRAW);
@@ -144,6 +168,10 @@ int main()
 
         // Model matrix
         pmath::Mat4 model;
+        model.scale(SCREEN_SCALE, SCREEN_SCALE, SCREEN_SCALE);
+        model.rotateX(ROT_X);
+        model.rotateY(ROT_Y);
+        model.shift(SHIFT_X, SHIFT_Y, 0.0f);
         // View matrix
         pmath::Mat4 view;
 		view.shift(0.0f, 0.0f, 5.0f);
@@ -183,4 +211,72 @@ void processInput(GLFWwindow* window)
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+// GLFW scroll handling
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    float minScale = 0.1f;
+    float maxScale = 5.0f;
+
+    SCREEN_SCALE += static_cast<float>(yoffset) * SCROLL_SPEED;
+
+    if (SCREEN_SCALE > maxScale) {
+        SCREEN_SCALE = maxScale;
+    }
+    else if (SCREEN_SCALE < minScale) {
+        SCREEN_SCALE = minScale;
+    }
+}
+
+// GLFW mouse button handling
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (action == GLFW_PRESS) {
+            LMB_PRESSED = true;
+            glfwGetCursorPos(window, &LAST_MOUSE_X, &LAST_MOUSE_Y);
+        }
+        else if (action == GLFW_RELEASE) {
+            LMB_PRESSED = false;
+        }
+    }
+
+    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+        if (action == GLFW_PRESS) {
+            RMB_PRESSED = true;
+            glfwGetCursorPos(window, &LAST_MOUSE_X, &LAST_MOUSE_Y);
+        }
+        else if (action == GLFW_RELEASE) {
+            RMB_PRESSED = false;
+        }
+    }
+}
+
+// GLFW mouse movement handling
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    if (LMB_PRESSED) {
+        double deltaX = LAST_MOUSE_X - xpos;
+        double deltaY = LAST_MOUSE_Y - ypos;
+
+        ROT_Y += static_cast<float>(deltaX) * ROTATE_SPEED;
+        ROT_X += static_cast<float>(deltaY) * ROTATE_SPEED;
+
+        LAST_MOUSE_X = xpos;
+        LAST_MOUSE_Y = ypos;
+    }
+    else if (RMB_PRESSED) {
+        double deltaX = xpos - LAST_MOUSE_X;
+        double deltaY = ypos - LAST_MOUSE_Y;
+
+        SHIFT_X += static_cast<float>(deltaX) * PAN_SPEED;
+        SHIFT_Y -= static_cast<float>(deltaY) * PAN_SPEED;
+
+        LAST_MOUSE_X = xpos;
+        LAST_MOUSE_Y = ypos;
+    }
 }

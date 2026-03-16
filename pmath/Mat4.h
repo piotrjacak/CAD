@@ -128,7 +128,7 @@ namespace pmath {
 			matrix.m[1][3] = y;
 			matrix.m[2][3] = z;
 
-			*this = *this * matrix;
+			*this = matrix * *this;
 		}
 
 		// Scale
@@ -137,7 +137,7 @@ namespace pmath {
 			matrix.m[0][0] = x;
 			matrix.m[1][1] = y;
 			matrix.m[2][2] = z;
-			*this = *this * matrix;
+			*this = matrix * *this;
 		}
 
 		// Rotation (OX)
@@ -149,7 +149,7 @@ namespace pmath {
 			matrix.m[1][2] = -s;
 			matrix.m[2][1] = s;
 			matrix.m[2][2] = c;
-			*this = *this * matrix;
+			*this = matrix * *this;
 		}
 
 		// Rotation (OY)
@@ -161,7 +161,7 @@ namespace pmath {
 			matrix.m[0][2] = s;
 			matrix.m[2][0] = -s;
 			matrix.m[2][2] = c;
-			*this = *this * matrix;
+			*this = matrix * *this;
 		}
 
 		// Rotation (OZ)
@@ -173,7 +173,7 @@ namespace pmath {
 			matrix.m[0][1] = -s;
 			matrix.m[1][0] = s;
 			matrix.m[1][1] = c;
-			*this = *this * matrix;
+			*this = matrix * *this;
 		}
 	};
 }
