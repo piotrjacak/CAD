@@ -137,10 +137,14 @@
     <ClInclude Include="imgui\imstb_rectpack.h" />
     <ClInclude Include="imgui\imstb_textedit.h" />
     <ClInclude Include="imgui\imstb_truetype.h" />
-    <ClInclude Include="Mat4.h" />
-    <ClInclude Include="pmath.h" />
-    <ClInclude Include="Vec3.h" />
-    <ClInclude Include="Vec4.h" />
+    <ClInclude Include="matrices.h" />
+    <ClInclude Include="pmath\Mat4.h" />
+    <ClInclude Include="pmath\pmath.h" />
+    <ClInclude Include="pmath\Torus.h" />
+    <ClInclude Include="pmath\Utils.h" />
+    <ClInclude Include="pmath\Vec3.h" />
+    <ClInclude Include="pmath\Vec4.h" />
+    <ClInclude Include="shader.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad.c" />
@@ -152,9 +156,12 @@
     <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="matrices.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
+    <None Include="shader.fs" />
+    <None Include="shader.vs" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

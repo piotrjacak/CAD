@@ -1,6 +1,5 @@
 #pragma once
 #include <cmath>
-#include "Vec4.h"
 
 namespace pmath {
 
@@ -55,18 +54,19 @@ namespace pmath {
 		}
 
 		// Transpose
-		Mat4 transpose() const {
+		void transpose() {
 			Mat4 result;
 			for (int i = 0; i < 4; i++) {
 				for (int j = 0; j < 4; j++) {
-					result.m[i][j] = m[j][i];
+					float temp = m[i][j];
+					m[i][j] = m[j][i];
+					m[j][i] = temp;
 				}
 			}
-			return result;
 		}
 
 		// Inverse
-		Mat4 inverse() const {
+		void inverse() {
 			Mat4 inv;
 
 			float A2323 = m[2][2] * m[3][3] - m[2][3] * m[3][2];
@@ -94,7 +94,7 @@ namespace pmath {
 				- m[0][3] * (m[1][0] * A1223 - m[1][1] * A0223 + m[1][2] * A0123);
 
 			if (std::fabs(det) < 1e-8f) {
-				return Mat4(0.0f);
+				*this = Mat4(0.0f);
 			}
 
 			float invDet = 1.0f / det;
@@ -116,31 +116,32 @@ namespace pmath {
 			inv.m[3][2] = -invDet * (m[0][0] * A1213 - m[0][1] * A0213 + m[0][2] * A0113);
 			inv.m[3][3] = invDet * (m[0][0] * A1212 - m[0][1] * A0212 + m[0][2] * A0112);
 
-			return inv;
+			*this = inv;
 		}
 
 
 		// Shift 
-		Mat4 shift(float x, float y, float z) const {
+		void shift(float x, float y, float z) {
 			Mat4 matrix;
 
 			matrix.m[0][3] = x;
 			matrix.m[1][3] = y;
 			matrix.m[2][3] = z;
-			return *this * matrix;
+
+			*this = *this * matrix;
 		}
 
 		// Scale
-		Mat4 scale(float x, float y, float z) const {
+		void scale(float x, float y, float z) {
 			Mat4 matrix;
 			matrix.m[0][0] = x;
 			matrix.m[1][1] = y;
 			matrix.m[2][2] = z;
-			return *this * matrix;
+			*this = *this * matrix;
 		}
 
 		// Rotation (OX)
-		Mat4 rotateX(float angle) const {
+		void rotateX(float angle) {
 			Mat4 matrix;
 			float c = std::cos(angle);
 			float s = std::sin(angle);
@@ -148,11 +149,11 @@ namespace pmath {
 			matrix.m[1][2] = -s;
 			matrix.m[2][1] = s;
 			matrix.m[2][2] = c;
-			return *this * matrix;
+			*this = *this * matrix;
 		}
 
 		// Rotation (OY)
-		Mat4 rotateY(float angle) const {
+		void rotateY(float angle) {
 			Mat4 matrix;
 			float c = std::cos(angle);
 			float s = std::sin(angle);
@@ -160,11 +161,11 @@ namespace pmath {
 			matrix.m[0][2] = s;
 			matrix.m[2][0] = -s;
 			matrix.m[2][2] = c;
-			return *this * matrix;
+			*this = *this * matrix;
 		}
 
 		// Rotation (OZ)
-		Mat4 rotateZ(float angle) const {
+		void rotateZ(float angle) {
 			Mat4 matrix;
 			float c = std::cos(angle);
 			float s = std::sin(angle);
@@ -172,7 +173,7 @@ namespace pmath {
 			matrix.m[0][1] = -s;
 			matrix.m[1][0] = s;
 			matrix.m[1][1] = c;
-			return *this * matrix;
+			*this = *this * matrix;
 		}
 	};
 }
