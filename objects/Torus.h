@@ -2,25 +2,23 @@
 
 #include <cmath>
 #include <vector>
-#include "Utils.h"
+#include "../pmath/Utils.h"
 
-namespace pmath 
-{
-	struct Torus 
+namespace objects {
+	struct Torus
 	{
 		std::vector<float> vertices;
 		std::vector<unsigned int> indices;
 
 		Torus(float R, float r, int alphaAcc, int betaAcc)
 		{
-
 			for (int i = 0; i < alphaAcc; i++)
 			{
-				float alpha = i * (2.0f * PI / alphaAcc);
+				float alpha = i * (2.0f * pmath::PI / alphaAcc);
 
 				for (int j = 0; j < betaAcc; j++)
 				{
-					float beta = j * (2.0f * PI / betaAcc);
+					float beta = j * (2.0f * pmath::PI / betaAcc);
 
 					// Vertices
 					float x = (R + r * std::cos(alpha)) * std::cos(beta);
@@ -49,4 +47,6 @@ namespace pmath
 		}
 	};
 }
+
+
 

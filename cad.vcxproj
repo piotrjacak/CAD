@@ -138,9 +138,10 @@
     <ClInclude Include="imgui\imstb_textedit.h" />
     <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="matrices.h" />
+    <ClInclude Include="objects\SceneObject.h" />
+    <ClInclude Include="objects\Torus.h" />
     <ClInclude Include="pmath\Mat4.h" />
     <ClInclude Include="pmath\pmath.h" />
-    <ClInclude Include="pmath\Torus.h" />
     <ClInclude Include="pmath\Utils.h" />
     <ClInclude Include="pmath\Vec3.h" />
     <ClInclude Include="pmath\Vec4.h" />
@@ -160,6 +161,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
+    <None Include="objects\cursorShader.fs" />
+    <None Include="objects\cursorShader.vs" />
     <None Include="shader.fs" />
     <None Include="shader.vs" />
   </ItemGroup>

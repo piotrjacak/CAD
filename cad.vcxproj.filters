@@ -25,6 +25,9 @@
     <Filter Include="Source Files\shaders">
       <UniqueIdentifier>{5d56efa2-457e-4546-b403-0850466345f3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\objects">
+      <UniqueIdentifier>{1c43e638-d373-45d4-9157-27ba4a717704}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imgui\imconfig.h">
@@ -72,11 +75,14 @@
     <ClInclude Include="shader.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
-    <ClInclude Include="pmath\Torus.h">
-      <Filter>Resource Files\pmath</Filter>
-    </ClInclude>
     <ClInclude Include="pmath\Utils.h">
       <Filter>Resource Files\pmath</Filter>
+    </ClInclude>
+    <ClInclude Include="objects\Torus.h">
+      <Filter>Resource Files\objects</Filter>
+    </ClInclude>
+    <ClInclude Include="objects\SceneObject.h">
+      <Filter>Resource Files\objects</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -117,6 +123,12 @@
       <Filter>Source Files\shaders</Filter>
     </None>
     <None Include="shader.fs">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="objects\cursorShader.vs">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="objects\cursorShader.fs">
       <Filter>Source Files\shaders</Filter>
     </None>
   </ItemGroup>
