@@ -20,12 +20,13 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
 
 enum class PivotType { Local, Median, Cursor };
+enum class RotationAxis { Free, X, Y, Z };
 
 // GLOBAL VARIABLES
-//const unsigned int SCR_WIDTH = 1800;
-//const unsigned int SCR_HEIGHT = 1200;
-const unsigned int SCR_WIDTH = 1600;
-const unsigned int SCR_HEIGHT = 1000;
+const unsigned int SCR_WIDTH = 1800;
+const unsigned int SCR_HEIGHT = 1200;
+//const unsigned int SCR_WIDTH = 1600;
+//const unsigned int SCR_HEIGHT = 1000;
 
 // Speed variables
 float SCROLL_SPEED = 0.1f;
@@ -39,7 +40,6 @@ float ROT_Y = 0.0f;
 float SHIFT_X = 0.0f;
 float SHIFT_Y = 0.0f;
 
-
 // Control variables
 bool CAM_ROTATE_ACTIVE = false;     // Alt + LMB
 bool CAM_PAN_ACTIVE = false;        // Alt + RMB
@@ -48,7 +48,7 @@ bool RMB_PRESSED = false;           // RMB
 bool SET_CURSOR_FLAG = false;       // Shift + RMB
 bool PROCESS_SELECTION = false; 
 bool MULTI_SELECT = false;          // CTRL
-bool SCALE_ACTIVE = false;          // S + LPM
+bool OBJ_SCALE_ACTIVE = false;          // S + LPM
 bool OBJ_ROTATE_ACTIVE = false;     // R + LPM
 bool OBJ_TRANSLATE_ACTIVE = false;  // T + LPM
 
@@ -57,16 +57,46 @@ double TARGET_CURSOR_X = 0.0;
 double TARGET_CURSOR_Y = 0.0;
 double LAST_MOUSE_X = 0.0;
 double LAST_MOUSE_Y = 0.0;
+double START_MOUSE_X = 0.0;
+double START_MOUSE_Y = 0.0;
 double SELECT_MOUSE_X = 0.0;
 double SELECT_MOUSE_Y = 0.0;
 
 PivotType CURRENT_PIVOT = PivotType::Local;
+RotationAxis CURRENT_ROT_AXIS = RotationAxis::Free;
+
+
 float cursorX = 0.0f, cursorY = 0.0f, cursorZ = 0.0f;
-pmath::Vec3 medianWorldPos(0.0f, 0.0f, 0.0f);
+pmath::Vec3 medianPoint(0.0f, 0.0f, 0.0f);
+pmath::Vec3 pivotPoint(0.0f, 0.0f, 0.0f);
 
 std::vector<objects::SceneObject> sceneObjects;
 int torusCounter = 1;
 int pointCounter = 1;
+
+std::vector<float> cursorVertices = {
+    0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+    1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+    0.9f, 0.1f, 0.0f, 1.0f, 0.0f, 0.0f,
+    0.9f, -0.1f, 0.0f, 1.0f, 0.0f, 0.0f,
+
+    0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+    -0.1f, 0.9f, 0.0f, 0.0f, 1.0f, 0.0f,
+     0.1f, 0.9f, 0.0f, 0.0f, 1.0f, 0.0f,
+
+    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+    0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+    -0.1f, 0.0f, 0.9f, 0.0f, 0.0f, 1.0f,
+    0.1f, 0.0f, 0.9f, 0.0f, 0.0f, 1.0f
+};
+std::vector<unsigned int> cursorIndices = {
+    0, 1, 1, 2, 1, 3, 4, 5, 5, 6, 5, 7, 8, 9, 9, 10, 9, 11
+};
+
+float default_R = 1.0f;
+float default_r = 0.3f;
+int default_meshAcc = 64;
 
 
 int main()
@@ -104,32 +134,13 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
     // High resolution screen setting
-    //float scale_factor = 1.5f;
-    //ImGui::GetStyle().ScaleAllSizes(scale_factor);
-    //io.FontGlobalScale = scale_factor;
+    float scale_factor = 1.5f;
+    ImGui::GetStyle().ScaleAllSizes(scale_factor);
+    io.FontGlobalScale = scale_factor;
 	// -- END OF BOILERPLATE CODE --
 
 
     // CREATE CURSOR
-    std::vector<float> cursorVertices = {
-		0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-		0.9f, 0.1f, 0.0f, 1.0f, 0.0f, 0.0f,
-		0.9f, -0.1f, 0.0f, 1.0f, 0.0f, 0.0f,
-
-		0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-        -0.1f, 0.9f, 0.0f, 0.0f, 1.0f, 0.0f,
-		 0.1f, 0.9f, 0.0f, 0.0f, 1.0f, 0.0f,
-        
-		0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-		0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-		-0.1f, 0.0f, 0.9f, 0.0f, 0.0f, 1.0f,
-		0.1f, 0.0f, 0.9f, 0.0f, 0.0f, 1.0f
-    };
-    std::vector<unsigned int> cursorIndices = {
-		0, 1, 1, 2, 1, 3, 4, 5, 5, 6, 5, 7, 8, 9, 9, 10, 9, 11
-    };
 	float screenCursorX = 0.0f, screenCursorY = 0.0f;
 	unsigned int cursorVAO, cursorVBO, cursorEBO;
 	glGenVertexArrays(1, &cursorVAO);
@@ -150,26 +161,7 @@ int main()
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
     glBindVertexArray(0);
-    
-
-    // CREATE TORUS
-    float R = 1.0f;
-    float r = 0.3f;
-    int meshAcc = 64;
-    objects::Torus t(R, r, meshAcc, meshAcc);
-    unsigned int torusVAO, torusVBO, torusEBO;
-    glGenVertexArrays(1, &torusVAO);
-    glGenBuffers(1, &torusVBO);
-    glGenBuffers(1, &torusEBO);
-    glBindVertexArray(torusVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, torusVBO);
-    glBufferData(GL_ARRAY_BUFFER, t.vertices.size() * sizeof(float), t.vertices.data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, torusEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, t.indices.size() * sizeof(unsigned int), t.indices.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
-
+   
 
     // CREATE POINT
     unsigned int pointVAO, pointVBO;
@@ -200,21 +192,48 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         // Set up position and flags for the control panel
-        float panel_width = 400.0f;
+        float panel_width = 500.0f;
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
-        ImGui::SetNextWindowPos(ImVec2(display_w - panel_width, 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(panel_width, (float)display_h), ImGuiCond_Always);
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove;
 
-        bool changesMade = false;
+        bool isAnyTorusSelected = false;
+        float currentR = default_R, current_r = default_r;
+        int currentMeshAcc = default_meshAcc;
+        for (auto& obj : sceneObjects)
+        {
+            if (obj.isSelected && obj.type == objects::ObjectType::Torus)
+            {
+                isAnyTorusSelected = true;
+                currentR = obj.R;
+                current_r = obj.r;
+                currentMeshAcc = obj.meshAcc;
+                break;
+            }
+        }
         ImGui::Begin("Options", nullptr, window_flags);
-        ImGui::Text("Torus parameters");
-		if (ImGui::SliderFloat("R", &R, 0.3f, 2.0f)) changesMade = true;
-		if (ImGui::SliderFloat("r", &r, 0.1f, 1.0f)) changesMade = true;
-        ImGui::Text("Mesh accuracy");
-		if (ImGui::SliderInt("m", &meshAcc, 6, 128)) changesMade = true;
+        if (isAnyTorusSelected) 
+        {
+            ImGui::Text("Selected Torus Parameters");
+            bool paramsChanged = false;
+            if (ImGui::SliderFloat("R", &currentR, 0.3f, 2.0f)) paramsChanged = true;
+            if (ImGui::SliderFloat("r", &current_r, 0.1f, 1.0f)) paramsChanged = true;
+            if (ImGui::SliderInt("m", &currentMeshAcc, 6, 128)) paramsChanged = true;
+            if (paramsChanged) {
+                for (auto& obj : sceneObjects) {
+                    if (obj.isSelected && obj.type == objects::ObjectType::Torus) {
+                        obj.R = currentR;
+                        obj.r = current_r;
+                        obj.meshAcc = currentMeshAcc;
+                        obj.needsUpdate = true;
+                    }
+                }
+            }
+        }
+        else ImGui::TextDisabled("Select a Torus to edit parameters.");
 
 		ImGui::Separator();
 		ImGui::Text("Cursor position");
@@ -232,7 +251,13 @@ int main()
             objects::SceneObject obj;
             obj.name = "Torus " + std::to_string(torusCounter++);
             obj.type = objects::ObjectType::Torus;
-            obj.posX = cursorX; obj.posY = cursorY; obj.posZ = cursorZ;
+            obj.transform.shift(cursorX, cursorY, cursorZ);
+
+            obj.R = default_R;
+            obj.r = default_r;
+            obj.meshAcc = default_meshAcc;
+            obj.needsUpdate = true;
+
             sceneObjects.push_back(obj);
         }
         ImGui::SameLine();
@@ -241,7 +266,7 @@ int main()
             objects::SceneObject obj;
             obj.name = "Point " + std::to_string(pointCounter++);
             obj.type = objects::ObjectType::Point;
-            obj.posX = cursorX; obj.posY = cursorY; obj.posZ = cursorZ;
+            obj.transform.shift(cursorX, cursorY, cursorZ);
             sceneObjects.push_back(obj);
         }
 
@@ -253,6 +278,11 @@ int main()
             {
                 if (sceneObjects[i].isSelected) 
                 {
+                    if (sceneObjects[i].VAO != 0) {
+                        glDeleteVertexArrays(1, &sceneObjects[i].VAO);
+                        glDeleteBuffers(1, &sceneObjects[i].VBO);
+                        glDeleteBuffers(1, &sceneObjects[i].EBO);
+                    }
                     sceneObjects.erase(sceneObjects.begin() + i);
                 }
             }
@@ -302,6 +332,15 @@ int main()
         ImGui::RadioButton("Median", &pivot, 1); ImGui::SameLine();
         ImGui::RadioButton("Cursor", &pivot, 2);
         CURRENT_PIVOT = (PivotType)pivot;
+
+        ImGui::Text("Objects Rotation Axis");
+        int rotAxis = (int)CURRENT_ROT_AXIS;
+        ImGui::RadioButton("Free (XY)", &rotAxis, 0); ImGui::SameLine();
+        ImGui::RadioButton("X", &rotAxis, 1); ImGui::SameLine();
+        ImGui::RadioButton("Y", &rotAxis, 2); ImGui::SameLine();
+        ImGui::RadioButton("Z", &rotAxis, 3);
+        CURRENT_ROT_AXIS = (RotationAxis)rotAxis;
+
         ImGui::End();
         ImGui::Render();
 
@@ -325,17 +364,6 @@ int main()
         shaderProgram.use();
 		shaderProgram.setMat4("view", view);
 		shaderProgram.setMat4("projection", projection);
-
-
-        // -- TORUS SETUP IF CHANGED --
-        if (changesMade) 
-        {
-            t = objects::Torus(R, r, meshAcc, meshAcc);
-            glBindBuffer(GL_ARRAY_BUFFER, torusVBO);
-            glBufferData(GL_ARRAY_BUFFER, t.vertices.size() * sizeof(float), t.vertices.data(), GL_STATIC_DRAW);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, torusEBO);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, t.indices.size() * sizeof(unsigned int), t.indices.data(), GL_STATIC_DRAW);
-		}
 
 
         // -- CURSOR SETUP --
@@ -415,7 +443,7 @@ int main()
 
             for (int i = 0; i < sceneObjects.size(); ++i) 
             {
-                pmath::Vec3 objPos(sceneObjects[i].posX, sceneObjects[i].posY, sceneObjects[i].posZ);
+                pmath::Vec3 objPos(sceneObjects[i].transform.m[0][3], sceneObjects[i].transform.m[1][3], sceneObjects[i].transform.m[2][3]);
 
 				// From camera to object
                 pmath::Vec3 v = objPos - rayOrigin;
@@ -425,11 +453,15 @@ int main()
 				if (t > 0.0f) // Object behind the camera is ignored
                 { 
                     pmath::Vec3 closestPoint = rayOrigin + (rayDir * t);
-
                     float distToRay = (objPos - closestPoint).length();
-                    float threshold = (sceneObjects[i].type == objects::ObjectType::Torus) ? (R * sceneObjects[i].scale) : (0.3f * sceneObjects[i].scale);
 
-                    if (distToRay < threshold && t < minDistanceToCamera) 
+                    float scaleX = std::sqrt(sceneObjects[i].transform.m[0][0] * sceneObjects[i].transform.m[0][0] +
+                        sceneObjects[i].transform.m[1][0] * sceneObjects[i].transform.m[1][0] +
+                        sceneObjects[i].transform.m[2][0] * sceneObjects[i].transform.m[2][0]);
+
+                    float threshold = (sceneObjects[i].type == objects::ObjectType::Torus) ? (sceneObjects[i].R * scaleX) : (0.3f * scaleX);
+
+                    if (distToRay < threshold && t < minDistanceToCamera)
                     {
                         minDistanceToCamera = t;
                         hitIndex = i;
@@ -446,40 +478,33 @@ int main()
                     sceneObjects[hitIndex].isSelected = true;
                 }
                 else
-                {
                     sceneObjects[hitIndex].isSelected = !sceneObjects[hitIndex].isSelected;
-                }
             }
             else 
             {
                 if (!MULTI_SELECT) 
-                {
-                    for (auto& obj : sceneObjects)
-                    {
-                        obj.isSelected = false;
-                    }
-                }
+                    for (auto& obj : sceneObjects) obj.isSelected = false;
             }
         }
 
 
 		// -- MEDIAN POINT SETUP --
         int selectedCount = 0;
-		medianWorldPos = pmath::Vec3(0.0f, 0.0f, 0.0f);
+		medianPoint = pmath::Vec3(0.0f, 0.0f, 0.0f);
         for (const auto& obj : sceneObjects)
         {
             if (obj.isSelected) 
             {
-                medianWorldPos = medianWorldPos + pmath::Vec3(obj.posX, obj.posY, obj.posZ);
+                medianPoint = medianPoint + pmath::Vec3(obj.transform.m[0][3], obj.transform.m[1][3], obj.transform.m[2][3]);
                 selectedCount++;
             }
         }
         if (selectedCount > 0)
         {
-            medianWorldPos = medianWorldPos * (1.0f / static_cast<float>(selectedCount));
+            medianPoint = medianPoint * (1.0f / static_cast<float>(selectedCount));
 
             pmath::Mat4 medianLocal;
-            medianLocal.shift(medianWorldPos.x, medianWorldPos.y, medianWorldPos.z);
+            medianLocal.shift(medianPoint.x, medianPoint.y, medianPoint.z);
             pmath::Mat4 medianModel = sceneModel * medianLocal;
 
             shaderProgram.use();
@@ -502,15 +527,9 @@ int main()
         glBindVertexArray(0);
 
         shaderProgram.use();
-        for (const auto& obj : sceneObjects) 
+        for (auto& obj : sceneObjects) 
         {
-            pmath::Mat4 objectLocal;
-            objectLocal.scale(obj.scale, obj.scale, obj.scale);
-            objectLocal.rotateX(obj.rotX);
-            objectLocal.rotateY(obj.rotY);
-            objectLocal.shift(obj.posX, obj.posY, obj.posZ);
-
-            pmath::Mat4 objectModel = sceneModel * objectLocal;
+            pmath::Mat4 objectModel = sceneModel * obj.transform;
             shaderProgram.setMat4("model", objectModel);
 
             if (obj.isSelected) shaderProgram.setVec3("uColor", 0.7f, 0.8f, 1.0f);
@@ -518,9 +537,32 @@ int main()
 
             if (obj.type == objects::ObjectType::Torus) 
             {
-                glBindVertexArray(torusVAO);
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); 
-                glDrawElements(GL_TRIANGLES, t.indices.size(), GL_UNSIGNED_INT, 0);
+                if (obj.needsUpdate || obj.VAO == 0)
+                {
+                    if (obj.VAO == 0) 
+                    {
+                        glGenVertexArrays(1, &obj.VAO);
+                        glGenBuffers(1, &obj.VBO);
+                        glGenBuffers(1, &obj.EBO);
+                    }
+
+                    objects::Torus t(obj.R, obj.r, obj.meshAcc, obj.meshAcc);
+                    glBindVertexArray(obj.VAO);
+                    glBindBuffer(GL_ARRAY_BUFFER, obj.VBO);
+                    glBufferData(GL_ARRAY_BUFFER, t.vertices.size() * sizeof(float), t.vertices.data(), GL_STATIC_DRAW);
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj.EBO);
+                    glBufferData(GL_ELEMENT_ARRAY_BUFFER, t.indices.size() * sizeof(unsigned int), t.indices.data(), GL_STATIC_DRAW);
+                    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+                    glEnableVertexAttribArray(0);
+                    glBindVertexArray(0);
+
+                    obj.indexCount = t.indices.size();
+                    obj.needsUpdate = false;
+                }
+
+                glBindVertexArray(obj.VAO);
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                glDrawElements(GL_TRIANGLES, obj.indexCount, GL_UNSIGNED_INT, 0);
                 glBindVertexArray(0);
             }
             else if (obj.type == objects::ObjectType::Point) 
@@ -596,22 +638,26 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
                 CAM_ROTATE_ACTIVE = true;
                 glfwGetCursorPos(window, &LAST_MOUSE_X, &LAST_MOUSE_Y);
             }
-            else if (s_pressed) 
+            else if (s_pressed || r_pressed || t_pressed)
             {
-                // Scale mode
-                SCALE_ACTIVE = true;
-                glfwGetCursorPos(window, &LAST_MOUSE_X, &LAST_MOUSE_Y);
-            }
-            else if (r_pressed)
-            {
-                OBJ_ROTATE_ACTIVE = true;
-                glfwGetCursorPos(window, &LAST_MOUSE_X, &LAST_MOUSE_Y);
-            }
-            else if (t_pressed)
-            {
-                OBJ_TRANSLATE_ACTIVE = true;
-                glfwGetCursorPos(window, &LAST_MOUSE_X, &LAST_MOUSE_Y);
-            }
+                if (s_pressed) OBJ_SCALE_ACTIVE = true;
+                else if (r_pressed) OBJ_ROTATE_ACTIVE = true;
+                else if (t_pressed) OBJ_TRANSLATE_ACTIVE = true;
+                glfwGetCursorPos(window, &START_MOUSE_X, &START_MOUSE_Y);
+
+                for (auto &obj : sceneObjects)
+                {
+                    if (obj.isSelected)
+                    {
+                        obj.initialTransform = obj.transform;
+                    }
+				}
+
+                if (CURRENT_PIVOT == PivotType::Median)
+                    pivotPoint = medianPoint;
+                else if (CURRENT_PIVOT == PivotType::Cursor)
+                    pivotPoint = pmath::Vec3(cursorX, cursorY, cursorZ);
+			}
             else 
             {
 				// Register selection start
@@ -625,7 +671,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         {
             CAM_ROTATE_ACTIVE = false;
             LMB_PRESSED = false;
-			SCALE_ACTIVE = false;
+			OBJ_SCALE_ACTIVE = false;
             OBJ_ROTATE_ACTIVE = false;
             OBJ_TRANSLATE_ACTIVE = false;
         }
@@ -663,113 +709,90 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 // GLFW mouse movement handling
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 {
+	double objectDeltaX = xpos - START_MOUSE_X;
+	double objectDeltaY = ypos - START_MOUSE_Y;
+	double cameraDeltaX = xpos - LAST_MOUSE_X;
+	double cameraDeltaY = ypos - LAST_MOUSE_Y;
+
 	if (CAM_ROTATE_ACTIVE) // camera rotation
     {
-        double deltaX = LAST_MOUSE_X - xpos;
-        double deltaY = LAST_MOUSE_Y - ypos;
-
-        ROT_Y += static_cast<float>(deltaX) * ROTATE_SPEED;
-        ROT_X += static_cast<float>(deltaY) * ROTATE_SPEED;
+        ROT_Y += static_cast<float>(-cameraDeltaX) * ROTATE_SPEED;
+        ROT_X += static_cast<float>(-cameraDeltaY) * ROTATE_SPEED;
 
         LAST_MOUSE_X = xpos;
         LAST_MOUSE_Y = ypos;
     }
 	else if (CAM_PAN_ACTIVE) // camera panning
     {
-        double deltaX = xpos - LAST_MOUSE_X;
-        double deltaY = ypos - LAST_MOUSE_Y;
-
-        SHIFT_X += static_cast<float>(deltaX) * PAN_SPEED;
-        SHIFT_Y -= static_cast<float>(deltaY) * PAN_SPEED;
+        SHIFT_X += static_cast<float>(cameraDeltaX) * PAN_SPEED;
+        SHIFT_Y -= static_cast<float>(cameraDeltaY) * PAN_SPEED;
 
         LAST_MOUSE_X = xpos;
         LAST_MOUSE_Y = ypos;
     }
-	else if (SCALE_ACTIVE) // object scaling
+	else if (OBJ_SCALE_ACTIVE) // object scaling
     {
-        double deltaX = xpos - LAST_MOUSE_X;
-        double deltaY = ypos - LAST_MOUSE_Y;
-
-        float scaleDelta = static_cast<float>(deltaX - deltaY) * 0.005f;
+        float scaleDelta = static_cast<float>(objectDeltaX - objectDeltaY) * 0.005f;
         float factor = 1.0f + scaleDelta;
-
         if (factor <= 0.01f) factor = 0.01f;
 
         pmath::Vec3 cursorPt(cursorX, cursorY, cursorZ);
 
-        for (auto& obj : sceneObjects) 
+        for (auto& obj : sceneObjects)
         {
             if (obj.isSelected)
             {
                 pmath::Vec3 pivot;
-                if (CURRENT_PIVOT == PivotType::Median) pivot = medianWorldPos;
-                else if (CURRENT_PIVOT == PivotType::Cursor) pivot = cursorPt;
-                else pivot = pmath::Vec3(obj.posX, obj.posY, obj.posZ);
+                if (CURRENT_PIVOT == PivotType::Local) 
+                    pivot = pmath::Vec3(obj.initialTransform.m[0][3], obj.initialTransform.m[1][3], obj.initialTransform.m[2][3]);
+                else pivot = pivotPoint;
 
-                pmath::Vec3 objPos(obj.posX, obj.posY, obj.posZ);
-                pmath::Vec3 vec = objPos - pivot;
+                pmath::Mat4 delta;
+                delta.shift(-pivot.x, -pivot.y, -pivot.z);
+                delta.scale(factor, factor, factor);
+                delta.shift(pivot.x, pivot.y, pivot.z);
 
-                vec = vec * factor;
-                objPos = pivot + vec;
-
-                obj.posX = objPos.x;
-                obj.posY = objPos.y;
-                obj.posZ = objPos.z;
-
-                obj.scale *= factor;
+                obj.transform = delta * obj.initialTransform;
             }
         }
-        LAST_MOUSE_X = xpos;
-        LAST_MOUSE_Y = ypos;
     }
 	else if (OBJ_ROTATE_ACTIVE) // object rotation
     {
-        double deltaX = LAST_MOUSE_X - xpos;
-        double deltaY = LAST_MOUSE_Y - ypos;
-
-        float rotAngleY = static_cast<float>(deltaX) * ROTATE_SPEED;
-        float rotAngleX = static_cast<float>(deltaY) * ROTATE_SPEED;
+        float rotAngleY = static_cast<float>(-objectDeltaX) * ROTATE_SPEED;
+        float rotAngleX = static_cast<float>(-objectDeltaY) * ROTATE_SPEED;
+        float combinedAngle = static_cast<float>(objectDeltaY - objectDeltaX) * ROTATE_SPEED;
 
         pmath::Vec3 cursorPt(cursorX, cursorY, cursorZ);
 
-        for (auto& obj : sceneObjects) 
+        for (auto& obj : sceneObjects)
         {
             if (obj.isSelected)
             {
                 pmath::Vec3 pivot;
-                if (CURRENT_PIVOT == PivotType::Median) pivot = medianWorldPos;
-                else if (CURRENT_PIVOT == PivotType::Cursor) pivot = cursorPt;
-                else pivot = pmath::Vec3(obj.posX, obj.posY, obj.posZ);
+                if (CURRENT_PIVOT == PivotType::Local) 
+                    pivot = pmath::Vec3(obj.initialTransform.m[0][3], obj.initialTransform.m[1][3], obj.initialTransform.m[2][3]);
+                else pivot = pivotPoint;
 
-                if (CURRENT_PIVOT != PivotType::Local) 
-                {
-                    pmath::Mat4 orbitMat;
-                    orbitMat.shift(-pivot.x, -pivot.y, -pivot.z);
-                    orbitMat.rotateX(rotAngleX);
-                    orbitMat.rotateY(rotAngleY);
-                    orbitMat.shift(pivot.x, pivot.y, pivot.z); 
-
-                    pmath::Vec4 oldPos(obj.posX, obj.posY, obj.posZ, 1.0f);
-                    pmath::Vec4 newPos = orbitMat * oldPos;
-
-                    obj.posX = newPos.x;
-                    obj.posY = newPos.y;
-                    obj.posZ = newPos.z;
+                pmath::Mat4 delta;
+                delta.shift(-pivot.x, -pivot.y, -pivot.z);
+                if (CURRENT_ROT_AXIS == RotationAxis::Free) {
+                    delta.rotateX(rotAngleX);
+                    delta.rotateY(rotAngleY);
                 }
-                obj.rotX += rotAngleX;
-                obj.rotY += rotAngleY;
+                else if (CURRENT_ROT_AXIS == RotationAxis::X) delta.rotateX(combinedAngle);
+                else if (CURRENT_ROT_AXIS == RotationAxis::Y) delta.rotateY(combinedAngle);
+                else if (CURRENT_ROT_AXIS == RotationAxis::Z) delta.rotateZ(combinedAngle);
+
+                delta.shift(pivot.x, pivot.y, pivot.z);
+
+                obj.transform = delta * obj.initialTransform;
             }
         }
-        LAST_MOUSE_X = xpos;
-        LAST_MOUSE_Y = ypos;
     }
 	else if (OBJ_TRANSLATE_ACTIVE) // object translation
     {
-        double deltaX = xpos - LAST_MOUSE_X;
-        double deltaY = ypos - LAST_MOUSE_Y;
-
-        float moveX = static_cast<float>(deltaX) * PAN_SPEED;
-        float moveY = static_cast<float>(-deltaY) * PAN_SPEED;
+        float moveX = static_cast<float>(objectDeltaX) * PAN_SPEED;
+        float moveY = static_cast<float>(-objectDeltaY) * PAN_SPEED;
 
         pmath::Mat4 invSceneModel;
         invSceneModel.scale(SCREEN_SCALE, SCREEN_SCALE, SCREEN_SCALE);
@@ -784,13 +807,11 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
         {
             if (obj.isSelected)
             {
-                obj.posX += worldMoveDir.x;
-                obj.posY += worldMoveDir.y;
-                obj.posZ += worldMoveDir.z;
+                pmath::Mat4 delta;
+                delta.shift(worldMoveDir.x, worldMoveDir.y, worldMoveDir.z);
+
+                obj.transform = delta * obj.initialTransform;
             }
         }
-
-        LAST_MOUSE_X = xpos;
-        LAST_MOUSE_Y = ypos;
     }
 }

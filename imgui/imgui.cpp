@@ -362,7 +362,9 @@ IMPLEMENTING SUPPORT for ImGuiBackendFlags_RendererHasTextures:
 
         // Most of your application code here
         ImGui::Text("Hello, world!");
-        MyGameUpdate(); // may use any Dear ImGui functions, e.g. ImGui::Begin("My window"); ImGui::Text("Hello, world!"); ImGui::End();
+        MyGameUpdate(); // may use any Dear ImGui functions, e.g. ImGui::Begin("My window"); ImGui::Text("Hello, world!"); ImGui
+        
+        ;
         MyGameRender(); // may use any Dear ImGui functions as well!
 
         // End the dear imgui frame
