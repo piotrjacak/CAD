@@ -1,0 +1,22 @@
+#version 400 core
+
+layout (isolines, equal_spacing, ccw) in;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+void main() 
+{
+    float t = gl_TessCoord.x;
+    float it = 1.0 - t;
+
+    vec4 p0 = gl_in[0].gl_Position;
+    vec4 p1 = gl_in[1].gl_Position;
+    vec4 p2 = gl_in[2].gl_Position;
+    vec4 p3 = gl_in[3].gl_Position;
+
+    // Równanie krzywej Beziera 3 stopnia
+    vec4 pos = (it*it*it)*p0 + 3.0*(it*it)*t*p1 + 3.0*it*(t*t)*p2 + (t*t*t)*p3;
+    gl_Position = projection * view * model * pos;
+}

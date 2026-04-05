@@ -119,16 +119,28 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
-    <None Include="shader.vs">
+    <None Include="bezierShader.vs">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="bezierShader.fs">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="bezierShader.tes">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="bezierShader.tcs">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="cursorShader.fs">
+      <Filter>Source Files\shaders</Filter>
+    </None>
+    <None Include="cursorShader.vs">
       <Filter>Source Files\shaders</Filter>
     </None>
     <None Include="shader.fs">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="objects\cursorShader.vs">
-      <Filter>Source Files\shaders</Filter>
-    </None>
-    <None Include="objects\cursorShader.fs">
+    <None Include="shader.vs">
       <Filter>Source Files\shaders</Filter>
     </None>
   </ItemGroup>

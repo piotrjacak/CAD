@@ -161,8 +161,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
-    <None Include="objects\cursorShader.fs" />
-    <None Include="objects\cursorShader.vs" />
+    <None Include="bezierShader.fs" />
+    <None Include="bezierShader.tcs" />
+    <None Include="bezierShader.tes" />
+    <None Include="bezierShader.vs" />
+    <None Include="cursorShader.fs" />
+    <None Include="cursorShader.vs" />
     <None Include="shader.fs" />
     <None Include="shader.vs" />
   </ItemGroup>
