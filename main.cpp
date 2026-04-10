@@ -48,7 +48,7 @@ bool RMB_PRESSED = false;           // RMB
 bool SET_CURSOR_FLAG = false;       // Shift + RMB
 bool PROCESS_SELECTION = false; 
 bool MULTI_SELECT = false;          // CTRL
-bool OBJ_SCALE_ACTIVE = false;          // S + LPM
+bool OBJ_SCALE_ACTIVE = false;      // S + LPM
 bool OBJ_ROTATE_ACTIVE = false;     // R + LPM
 bool OBJ_TRANSLATE_ACTIVE = false;  // T + LPM
 
@@ -823,6 +823,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 // GLFW scroll handling
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;
+
     float minScale = 0.1f;
     float maxScale = 5.0f;
 
