@@ -65,7 +65,6 @@ double SELECT_MOUSE_Y = 0.0;
 PivotType CURRENT_PIVOT = PivotType::Local;
 RotationAxis CURRENT_ROT_AXIS = RotationAxis::Free;
 
-
 float cursorX = 0.0f, cursorY = 0.0f, cursorZ = 0.0f;
 pmath::Vec3 medianPoint(0.0f, 0.0f, 0.0f);
 pmath::Vec3 pivotPoint(0.0f, 0.0f, 0.0f);
@@ -74,6 +73,7 @@ std::vector<objects::SceneObject> sceneObjects;
 int torusCounter = 1;
 int pointCounter = 1;
 int bezierC0Counter = 1;
+int bezierC2Counter = 1;
 uint32_t globalObjectIdCounter = 1;
 
 std::vector<float> cursorVertices = {
@@ -195,7 +195,7 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         // Set up position and flags for the control panel
-        float panel_width = 500.0f;
+        float panel_width = 600.0f;
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
@@ -204,6 +204,7 @@ int main()
             ImGuiWindowFlags_NoMove;
 
 		objects::SceneObject* selectedBezierC0 = nullptr;
+        objects::SceneObject* selectedBezierC2 = nullptr;
 		objects::SceneObject* selectedTorus = nullptr;
         float currentR = default_R, current_r = default_r;
         int currentMeshAcc = default_meshAcc;
@@ -222,6 +223,11 @@ int main()
                 selectedBezierC0 = &obj;
                 break;
 			}
+            if (obj.isSelected && obj.type == objects::ObjectType::BezierCurveC2)
+            {
+                selectedBezierC2 = &obj;
+                break;
+            }
         }
         ImGui::Begin("Options", nullptr, window_flags);
 		// Torus parameters in ImGui
@@ -296,7 +302,61 @@ int main()
             }
 			ImGui::EndChild();
         }
-		else ImGui::TextDisabled("Select a Bezier Curve to edit options.");
+		else ImGui::TextDisabled("Select a Bezier Curve C0 to edit options.");
+        ImGui::Separator();
+        if (selectedBezierC2)
+        {
+            ImGui::Text("Selected Bezier Curve C2 Options");
+            if (ImGui::Checkbox("Show polyline", &selectedBezierC2->showPolyline)) {}
+
+            // Prze³¹cznik bazy
+            int basis = selectedBezierC2->isBsplineBasis ? 0 : 1;
+            ImGui::Text("Curve Basis:");
+            if (ImGui::RadioButton("B-spline", &basis, 0)) selectedBezierC2->isBsplineBasis = true;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Bernstein", &basis, 1)) selectedBezierC2->isBsplineBasis = false;
+
+            if (ImGui::Button("Add selected point to curve"))
+            {
+                for (const auto& obj : sceneObjects)
+                {
+                    if (obj.isSelected && obj.type == objects::ObjectType::Point)
+                    {
+                        if (std::find(selectedBezierC2->controlPointIDs.begin(), selectedBezierC2->controlPointIDs.end(), obj.id) == selectedBezierC2->controlPointIDs.end())
+                        {
+                            selectedBezierC2->controlPointIDs.push_back(obj.id);
+                            selectedBezierC2->needsUpdate = true;
+                        }
+                    }
+                }
+            }
+
+            ImGui::Text("Control Points:");
+            ImGui::BeginChild("BezierC2ControlPoints", ImVec2(0, 150), true);
+            for (size_t i = 0; i < selectedBezierC2->controlPointIDs.size(); ++i)
+            {
+                ImGui::PushID(static_cast<int>(i));
+                uint32_t ptID = selectedBezierC2->controlPointIDs[i];
+                std::string ptName = "Unknown";
+                for (const auto& obj : sceneObjects)
+                {
+                    if (obj.id == ptID) { ptName = obj.name; break; }
+                }
+                ImGui::Text("%s (ID: %u)", ptName.c_str(), ptID);
+                ImGui::SameLine(ImGui::GetWindowWidth() - 70);
+
+                if (ImGui::Button("Remove"))
+                {
+                    selectedBezierC2->controlPointIDs.erase(selectedBezierC2->controlPointIDs.begin() + i);
+                    selectedBezierC2->needsUpdate = true;
+                    ImGui::PopID();
+                    break;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+        }
+		else ImGui::TextDisabled("Select a Bezier Curve C2 to edit options.");
 		ImGui::Separator();
 		ImGui::Text("Cursor position");
 		ImGui::DragFloat("Scene X", &cursorX, 0.01f);
@@ -362,6 +422,23 @@ int main()
             }
 
 			sceneObjects.push_back(obj);
+        }
+        if (ImGui::Button("Add Bezier Curve C2"))
+        {
+            objects::SceneObject obj;
+            obj.id = globalObjectIdCounter++;
+            obj.name = "Bezier C2 " + std::to_string(bezierC2Counter++);
+            obj.type = objects::ObjectType::BezierCurveC2;
+            obj.isBsplineBasis = true;
+            for (auto& otherObj : sceneObjects)
+            {
+                if (otherObj.isSelected && otherObj.type == objects::ObjectType::Point)
+                {
+                    obj.controlPointIDs.push_back(otherObj.id);
+                    obj.needsUpdate = true;
+                }
+            }
+            sceneObjects.push_back(obj);
         }
 
         ImGui::Separator();
@@ -547,49 +624,88 @@ int main()
             int hitIndex = -1;
             float minDistanceToCamera = 999999.0f;
 
-            for (int i = 0; i < sceneObjects.size(); ++i) 
+
+            // Virtual points logic
+            bool hitVirtualPoint = false;
+            for (auto& obj : sceneObjects)
             {
-                pmath::Vec3 objPos(sceneObjects[i].transform.m[0][3], sceneObjects[i].transform.m[1][3], sceneObjects[i].transform.m[2][3]);
+                if (obj.type == objects::ObjectType::BezierCurveC2) 
+                    obj.selectedVirtualPointIndex = -1;
 
-				// From camera to object
-                pmath::Vec3 v = objPos - rayOrigin;
+                if (obj.isSelected && obj.type == objects::ObjectType::BezierCurveC2 && !obj.isBsplineBasis)
+                {
+                    float minHitDistanceToRay = 999999.0f;
 
-                float t = v.dot(rayDir);
-
-				if (t > 0.0f) // Object behind the camera is ignored
-                { 
-                    pmath::Vec3 closestPoint = rayOrigin + (rayDir * t);
-                    float distToRay = (objPos - closestPoint).length();
-
-                    float scaleX = std::sqrt(sceneObjects[i].transform.m[0][0] * sceneObjects[i].transform.m[0][0] +
-                        sceneObjects[i].transform.m[1][0] * sceneObjects[i].transform.m[1][0] +
-                        sceneObjects[i].transform.m[2][0] * sceneObjects[i].transform.m[2][0]);
-
-                    float threshold = (sceneObjects[i].type == objects::ObjectType::Torus) ? (sceneObjects[i].R * scaleX) : (0.3f * scaleX);
-
-                    if (distToRay < threshold && t < minDistanceToCamera)
+                    for (int j = 0; j < obj.virtualPoints.size(); ++j)
                     {
-                        minDistanceToCamera = t;
-                        hitIndex = i;
+                        pmath::Vec3 worldPt = obj.virtualPoints[j];
+                        pmath::Vec3 v = worldPt - rayOrigin;
+                        float t = v.dot(rayDir);
+
+                        if (t > 0.0f)
+                        {
+                            pmath::Vec3 closestPoint = rayOrigin + (rayDir * t);
+                            float distToRay = (worldPt - closestPoint).length();
+                            float threshold = 0.15f;
+
+                            if (distToRay < threshold && distToRay < minHitDistanceToRay)
+                            {
+                                minHitDistanceToRay = distToRay;
+                                minDistanceToCamera = t;
+                                obj.selectedVirtualPointIndex = j;
+                                hitVirtualPoint = true;
+                            }
+                        }
                     }
                 }
             }
 
-			// Update selection based on hit
-            if (hitIndex != -1) 
+            
+            if (!hitVirtualPoint) 
             {
-                if (!MULTI_SELECT) 
+                for (int i = 0; i < sceneObjects.size(); ++i)
                 {
-                    for (auto& obj : sceneObjects) obj.isSelected = false;
-                    sceneObjects[hitIndex].isSelected = true;
+                    pmath::Vec3 objPos(sceneObjects[i].transform.m[0][3], sceneObjects[i].transform.m[1][3], sceneObjects[i].transform.m[2][3]);
+
+                    // From camera to object
+                    pmath::Vec3 v = objPos - rayOrigin;
+
+                    float t = v.dot(rayDir);
+
+                    if (t > 0.0f) // Object behind the camera is ignored
+                    {
+                        pmath::Vec3 closestPoint = rayOrigin + (rayDir * t);
+                        float distToRay = (objPos - closestPoint).length();
+
+                        float scaleX = std::sqrt(sceneObjects[i].transform.m[0][0] * sceneObjects[i].transform.m[0][0] +
+                            sceneObjects[i].transform.m[1][0] * sceneObjects[i].transform.m[1][0] +
+                            sceneObjects[i].transform.m[2][0] * sceneObjects[i].transform.m[2][0]);
+
+                        float threshold = (sceneObjects[i].type == objects::ObjectType::Torus) ? (sceneObjects[i].R * scaleX) : (0.3f * scaleX);
+
+                        if (distToRay < threshold && t < minDistanceToCamera)
+                        {
+                            minDistanceToCamera = t;
+                            hitIndex = i;
+                        }
+                    }
+                }
+                // Update selection based on hit
+                if (hitIndex != -1)
+                {
+                    if (!MULTI_SELECT)
+                    {
+                        for (auto& obj : sceneObjects) obj.isSelected = false;
+                        sceneObjects[hitIndex].isSelected = true;
+                    }
+                    else
+                        sceneObjects[hitIndex].isSelected = !sceneObjects[hitIndex].isSelected;
                 }
                 else
-                    sceneObjects[hitIndex].isSelected = !sceneObjects[hitIndex].isSelected;
-            }
-            else 
-            {
-                if (!MULTI_SELECT) 
-                    for (auto& obj : sceneObjects) obj.isSelected = false;
+                {
+                    if (!MULTI_SELECT)
+                        for (auto& obj : sceneObjects) obj.isSelected = false;
+                }
             }
         }
 
@@ -706,24 +822,24 @@ int main()
             }
             else if (obj.type == objects::ObjectType::BezierCurveC0)
             {
-				std::vector<pmath::Vec3> pts;
-                for (uint32_t ptID : obj.controlPointIDs) 
-                {
-                    for (const auto& otherObj : sceneObjects) 
-                    {
-                        if (otherObj.id == ptID && otherObj.type == objects::ObjectType::Point) 
-                        {
-                            pts.push_back(pmath::Vec3(otherObj.transform.m[0][3], otherObj.transform.m[1][3], otherObj.transform.m[2][3]));
-                            break;
-                        }
-                    }
-                }
-
-				int N = pts.size();
-				if (N == 0) continue;
-
                 if (obj.needsUpdate || obj.VAO == 0)
                 {
+                    std::vector<pmath::Vec3> pts;
+                    for (uint32_t ptID : obj.controlPointIDs)
+                    {
+                        for (const auto& otherObj : sceneObjects)
+                        {
+                            if (otherObj.id == ptID && otherObj.type == objects::ObjectType::Point)
+                            {
+                                pts.push_back(pmath::Vec3(otherObj.transform.m[0][3], otherObj.transform.m[1][3], otherObj.transform.m[2][3]));
+                                break;
+                            }
+                        }
+                    }
+
+                    int N = pts.size();
+                    if (N == 0) continue;
+
                     if (obj.VAO == 0) 
                     {
                         glGenVertexArrays(1, &obj.VAO);
@@ -791,8 +907,162 @@ int main()
                 glDrawElements(GL_PATCHES, obj.indexCount, GL_UNSIGNED_INT, 0);
 				glBindVertexArray(0);
             }
+            else if (obj.type == objects::ObjectType::BezierCurveC2)
+            {
+                if (obj.needsUpdate || obj.VAO == 0)
+                {
+                    std::vector<pmath::Vec3> pts;
+                    for (uint32_t ptID : obj.controlPointIDs)
+                    {
+                        for (const auto& otherObj : sceneObjects)
+                        {
+                            if (otherObj.id == ptID && otherObj.type == objects::ObjectType::Point)
+                            {
+                                pts.push_back(pmath::Vec3(otherObj.transform.m[0][3], otherObj.transform.m[1][3], otherObj.transform.m[2][3]));
+                                break;
+                            }
+                        }
+                    }
+
+                    int N = pts.size();
+                    if (N == 0) continue;
+
+                    if (obj.VAO == 0)
+                    {
+                        glGenVertexArrays(1, &obj.VAO);
+                        glGenBuffers(1, &obj.VBO);
+                        glGenBuffers(1, &obj.EBO);
+                    }
+
+                    // 1. Bezier control points for each segment
+                    std::vector<pmath::Vec3> bezierPts;
+                    if (N >= 4)
+                    {
+                        for (int i = 0; i <= N - 4; ++i)
+                        {
+                            pmath::Vec3 d0 = pts[i];
+                            pmath::Vec3 d1 = pts[i + 1];
+                            pmath::Vec3 d2 = pts[i + 2];
+                            pmath::Vec3 d3 = pts[i + 3];
+                            pmath::Vec3 b0 = (d0 + d1 * 4.0f + d2) * (1.0f / 6.0f);
+                            pmath::Vec3 b1 = (d1 * 2.0f + d2) * (1.0f / 3.0f);
+                            pmath::Vec3 b2 = (d1 + d2 * 2.0f) * (1.0f / 3.0f);
+                            pmath::Vec3 b3 = (d1 + d2 * 4.0f + d3) * (1.0f / 6.0f);
+
+                            bezierPts.push_back(b0);
+                            bezierPts.push_back(b1);
+                            bezierPts.push_back(b2);
+                            bezierPts.push_back(b3);
+                        }
+                    }
+
+                    obj.virtualPoints = bezierPts;
+
+                    std::vector<float> vboData;
+                    std::vector<unsigned int> polylineIndices;
+                    std::vector<unsigned int> patchIndices;
+
+                    // 2. Original polyline points
+                    for (int i = 0; i < N; ++i)
+                    {
+                        vboData.push_back(pts[i].x);
+                        vboData.push_back(pts[i].y);
+                        vboData.push_back(pts[i].z);
+                        polylineIndices.push_back(i);
+                    }
+
+					// 3. Curve points from Bezier segments
+                    int bezierStartIndex = N;
+                    for (size_t i = 0; i < bezierPts.size(); ++i)
+                    {
+                        vboData.push_back(bezierPts[i].x);
+                        vboData.push_back(bezierPts[i].y);
+                        vboData.push_back(bezierPts[i].z);
+                        patchIndices.push_back(bezierStartIndex + static_cast<unsigned int>(i));
+                    }
+
+                    std::vector<unsigned int> allIndices = polylineIndices;
+                    allIndices.insert(allIndices.end(), patchIndices.begin(), patchIndices.end());
+
+                    glBindVertexArray(obj.VAO);
+                    glBindBuffer(GL_ARRAY_BUFFER, obj.VBO);
+                    glBufferData(GL_ARRAY_BUFFER, vboData.size() * sizeof(float), vboData.data(), GL_STATIC_DRAW);
+
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj.EBO);
+                    glBufferData(GL_ELEMENT_ARRAY_BUFFER, allIndices.size() * sizeof(unsigned int), allIndices.data(), GL_STATIC_DRAW);
+
+                    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+                    glEnableVertexAttribArray(0);
+                    glBindVertexArray(0);
+
+                    obj.polylineIndexCount = polylineIndices.size();
+                    obj.curveIndexCount = patchIndices.size();
+                    obj.needsUpdate = false;
+                }
+
+                pmath::Mat4 curveModel = sceneModel;
+
+				// Bspline basis
+                if (obj.showPolyline && obj.isBsplineBasis)
+                {
+                    shaderProgram.use();
+                    shaderProgram.setMat4("model", curveModel);
+                    shaderProgram.setVec3("uColor", 0.2f, 0.6f, 0.8f);
+
+                    glBindVertexArray(obj.VAO);
+                    glDrawElements(GL_LINE_STRIP, obj.polylineIndexCount, GL_UNSIGNED_INT, (void*)0);
+                    glBindVertexArray(0);
+                }
+
+                // Bernstein basis
+                if (!obj.isBsplineBasis) 
+                {
+                    shaderProgram.use();
+                    shaderProgram.setVec3("uColor", 0.9f, 0.3f, 0.8f);
+                    glBindVertexArray(obj.VAO);
+                    glPointSize(10.0f);
+
+                    void* offset = (void*)(obj.polylineIndexCount * sizeof(unsigned int));
+                    glDrawElements(GL_POINTS, obj.curveIndexCount, GL_UNSIGNED_INT, offset);
+
+                    // Bernstein polyline
+                    if (obj.showPolyline)
+                    {
+                        shaderProgram.setVec3("uColor", 0.8f, 0.4f, 0.6f);
+                        glDrawElements(GL_LINE_STRIP, obj.curveIndexCount, GL_UNSIGNED_INT, offset);
+                    }
+
+                    if (obj.selectedVirtualPointIndex != -1)
+                    {
+                        glPointSize(15.0f);
+                        void* singlePointOffset = (void*)((obj.polylineIndexCount + obj.selectedVirtualPointIndex) * sizeof(unsigned int));
+                        glDrawElements(GL_POINTS, 1, GL_UNSIGNED_INT, singlePointOffset);
+                    }
+
+                    glBindVertexArray(0);
+                }
+
+                // Curve drawing
+                if (obj.curveIndexCount > 0)
+                {
+                    bezierShader.use();
+                    bezierShader.setMat4("model", curveModel);
+                    bezierShader.setMat4("view", view);
+                    bezierShader.setMat4("projection", projection);
+                    bezierShader.setVec3("screenSize", pmath::Vec3((float)display_w, (float)display_h, 0.0f));
+
+                    if (obj.isSelected) bezierShader.setVec3("uColor", 0.7f, 0.8f, 1.0f);
+                    else bezierShader.setVec3("uColor", 1.0f, 1.0f, 1.0f);
+
+                    glBindVertexArray(obj.VAO);
+                    glPatchParameteri(GL_PATCH_VERTICES, 4);
+
+                    void* offset = (void*)(obj.polylineIndexCount * sizeof(unsigned int));
+                    glDrawElements(GL_PATCHES, obj.curveIndexCount, GL_UNSIGNED_INT, offset);
+                    glBindVertexArray(0);
+                }
+            }
         }
-        
 
         // glfw: swap buffers
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -803,9 +1073,6 @@ int main()
     glfwTerminate();
     return 0;
 }
-
-
-
 
 
 
@@ -872,7 +1139,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
                     if (obj.isSelected)
                     {
                         obj.initialTransform = obj.transform;
-                        if (obj.type == objects::ObjectType::BezierCurveC0)
+                        if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2)
                         {
                             for (uint32_t ptID : obj.controlPointIDs)
                             {
@@ -1004,6 +1271,18 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
                     }
                     obj.needsUpdate = true;
                 }
+                else if (obj.type == objects::ObjectType::Point)
+                {
+                    for (auto& curve : sceneObjects)
+                    {
+                        if ((curve.type == objects::ObjectType::BezierCurveC0 || curve.type == objects::ObjectType::BezierCurveC2)
+                            && std::find(curve.controlPointIDs.begin(), curve.controlPointIDs.end(), obj.id) != curve.controlPointIDs.end())
+                        {
+                            curve.needsUpdate = true;
+                        }
+                    }
+                    obj.transform = delta * obj.initialTransform;
+                }
                 else
                 {
                     obj.transform = delta * obj.initialTransform;
@@ -1057,6 +1336,18 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
                     }
                     obj.needsUpdate = true;
                 }
+                else if (obj.type == objects::ObjectType::Point)
+                {
+                    for (auto& curve : sceneObjects)
+                    {
+                        if ((curve.type == objects::ObjectType::BezierCurveC0 || curve.type == objects::ObjectType::BezierCurveC2)
+                            && std::find(curve.controlPointIDs.begin(), curve.controlPointIDs.end(), obj.id) != curve.controlPointIDs.end())
+                        {
+                            curve.needsUpdate = true;
+                        }
+                    }
+                    obj.transform = delta * obj.initialTransform;
+                }
                 else
                 {
                     obj.transform = delta * obj.initialTransform;
@@ -1082,6 +1373,37 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
         {
             if (obj.isSelected)
             {
+                if (obj.type == objects::ObjectType::BezierCurveC2 && !obj.isBsplineBasis && obj.selectedVirtualPointIndex != -1)
+                {
+                    int j = obj.selectedVirtualPointIndex;
+                    int seg = j / 4;
+                    int p = j % 4; 
+
+                    int dIndex = -1;
+                    if (p == 0 || p == 1) dIndex = seg + 1;
+                    else if (p == 2 || p == 3) dIndex = seg + 2;
+
+                    if (dIndex >= 0 && dIndex < obj.controlPointIDs.size())
+                    {
+                        uint32_t pointToMoveID = obj.controlPointIDs[dIndex];
+                        pmath::Mat4 delta;
+                        delta.shift(worldMoveDir.x * 1.5f, worldMoveDir.y * 1.5f, worldMoveDir.z * 1.5f);
+
+                        for (auto& scenePt : sceneObjects)
+                        {
+                            if (scenePt.id == pointToMoveID)
+                            {
+                                scenePt.transform = delta * scenePt.initialTransform;
+                                scenePt.needsUpdate = true;
+                                break;
+                            }
+                        }
+                    }
+                    obj.needsUpdate = true;
+                    continue;
+                }
+
+
                 pmath::Mat4 delta;
                 delta.shift(worldMoveDir.x, worldMoveDir.y, worldMoveDir.z);
 

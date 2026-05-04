@@ -4,13 +4,13 @@
 namespace objects {
     enum class ObjectType { Torus, Point, BezierCurveC0, BezierCurveC2 };
 
-    enum class CurveBasis { Bernstein, BSpline };
+  //  enum class CurveBasis { Bernstein, BSpline };
 
-    struct VirtualPoint {
-		pmath::Mat4 transform;
-		pmath::Mat4 initialTransform;
-		bool isSelected = false;
-    };
+  //  struct VirtualPoint {
+		//pmath::Mat4 transform;
+		//pmath::Mat4 initialTransform;
+		//bool isSelected = false;
+  //  };
 
     struct SceneObject {
 		uint32_t id;
@@ -33,5 +33,13 @@ namespace objects {
 		// Bezier curve parameters
 		std::vector<uint32_t> controlPointIDs;
         bool showPolyline = true;
+
+        bool isBsplineBasis = true;
+        int polylineIndexCount = 0;
+        int curveIndexCount = 0;
+
+        // Bspline Bezier virtual points
+        std::vector<pmath::Vec3> virtualPoints;
+        int selectedVirtualPointIndex = -1;
     };
 }
