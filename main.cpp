@@ -74,6 +74,7 @@ int torusCounter = 1;
 int pointCounter = 1;
 int bezierC0Counter = 1;
 int bezierC2Counter = 1;
+int interpC2Counter = 1;
 uint32_t globalObjectIdCounter = 1;
 
 std::vector<float> cursorVertices = {
@@ -136,9 +137,9 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
     // High resolution screen setting
-    float scale_factor = 1.5f;
-    ImGui::GetStyle().ScaleAllSizes(scale_factor);
-    io.FontGlobalScale = scale_factor;
+    //float scale_factor = 1.5f;
+    //ImGui::GetStyle().ScaleAllSizes(scale_factor);
+    //io.FontGlobalScale = scale_factor;
 	// -- END OF BOILERPLATE CODE --
 
 
@@ -205,6 +206,7 @@ int main()
 
 		objects::SceneObject* selectedBezierC0 = nullptr;
         objects::SceneObject* selectedBezierC2 = nullptr;
+        objects::SceneObject* selectedInterpC2 = nullptr;
 		objects::SceneObject* selectedTorus = nullptr;
         float currentR = default_R, current_r = default_r;
         int currentMeshAcc = default_meshAcc;
@@ -226,6 +228,11 @@ int main()
             if (obj.isSelected && obj.type == objects::ObjectType::BezierCurveC2)
             {
                 selectedBezierC2 = &obj;
+                break;
+            }
+            if (obj.isSelected && obj.type == objects::ObjectType::InterpolatingCurveC2)
+            {
+                selectedInterpC2 = &obj;
                 break;
             }
         }
@@ -256,7 +263,6 @@ int main()
         {
             ImGui::Text("Selected Bezier Curve C0 Options");
             if (ImGui::Checkbox("Show polyline", &selectedBezierC0->showPolyline)) {}
-            //if (ImGui::Checkbox("Auto-add control points", &selectedBezierC0->isAutoAddActive)) {}
 
             if (ImGui::Button("Add selected point to curve"))
             {
@@ -357,7 +363,54 @@ int main()
             ImGui::EndChild();
         }
 		else ImGui::TextDisabled("Select a Bezier Curve C2 to edit options.");
-		ImGui::Separator();
+        ImGui::Separator();
+        if (selectedInterpC2)
+        {
+            ImGui::Text("Selected Interpolating Curve C2 Options");
+            if (ImGui::Checkbox("Show polyline", &selectedInterpC2->showPolyline)) {}
+
+            if (ImGui::Button("Add selected point to curve"))
+            {
+                for (const auto& obj : sceneObjects)
+                {
+                    if (obj.isSelected && obj.type == objects::ObjectType::Point)
+                    {
+                        if (std::find(selectedInterpC2->controlPointIDs.begin(), selectedInterpC2->controlPointIDs.end(), obj.id) == selectedInterpC2->controlPointIDs.end())
+                        {
+                            selectedInterpC2->controlPointIDs.push_back(obj.id);
+                            selectedInterpC2->needsUpdate = true;
+                        }
+                    }
+                }
+            }
+
+            ImGui::Text("Interpolation Points:");
+            ImGui::BeginChild("InterpC2Points", ImVec2(0, 150), true);
+            for (size_t i = 0; i < selectedInterpC2->controlPointIDs.size(); ++i)
+            {
+                ImGui::PushID(static_cast<int>(i));
+                uint32_t ptID = selectedInterpC2->controlPointIDs[i];
+                std::string ptName = "Unknown";
+                for (const auto& obj : sceneObjects)
+                {
+                    if (obj.id == ptID) { ptName = obj.name; break; }
+                }
+                ImGui::Text("%s (ID: %u)", ptName.c_str(), ptID);
+                ImGui::SameLine(ImGui::GetWindowWidth() - 70);
+
+                if (ImGui::Button("Remove"))
+                {
+                    selectedInterpC2->controlPointIDs.erase(selectedInterpC2->controlPointIDs.begin() + i);
+                    selectedInterpC2->needsUpdate = true;
+                    ImGui::PopID();
+                    break;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+        }
+        else ImGui::TextDisabled("Select an Interpolating Curve C2 to edit options.");
+        ImGui::Separator();
 		ImGui::Text("Cursor position");
 		ImGui::DragFloat("Scene X", &cursorX, 0.01f);
 		ImGui::DragFloat("Scene Y", &cursorY, 0.01f);
@@ -395,7 +448,8 @@ int main()
             for (auto& curve : sceneObjects)
             {
                 if ((curve.type == objects::ObjectType::BezierCurveC0
-                    || curve.type == objects::ObjectType::BezierCurveC2)
+                    || curve.type == objects::ObjectType::BezierCurveC2
+                    || curve.type == objects::ObjectType::InterpolatingCurveC2)
                     && curve.isSelected)
                 {
                     curve.controlPointIDs.push_back(obj.id);
@@ -440,7 +494,23 @@ int main()
             }
             sceneObjects.push_back(obj);
         }
-
+		ImGui::SameLine();
+        if (ImGui::Button("Add Interpolating C2"))
+        {
+            objects::SceneObject obj;
+            obj.id = globalObjectIdCounter++;
+            obj.name = "Interp C2 " + std::to_string(interpC2Counter++);
+            obj.type = objects::ObjectType::InterpolatingCurveC2;
+            for (auto& otherObj : sceneObjects)
+            {
+                if (otherObj.isSelected && otherObj.type == objects::ObjectType::Point)
+                {
+                    obj.controlPointIDs.push_back(otherObj.id);
+                    obj.needsUpdate = true;
+                }
+            }
+            sceneObjects.push_back(obj);
+        }
         ImGui::Separator();
         ImGui::Text("List of scene objects");
         if (ImGui::Button("Delete selected")) 
@@ -457,7 +527,8 @@ int main()
                     for (auto& curve : sceneObjects)
                     {
                         if ((curve.type == objects::ObjectType::BezierCurveC0
-                            || curve.type == objects::ObjectType::BezierCurveC2)
+                            || curve.type == objects::ObjectType::BezierCurveC2
+                            || curve.type == objects::ObjectType::InterpolatingCurveC2)
                             && std::find(curve.controlPointIDs.begin(), curve.controlPointIDs.end(), sceneObjects[i].id) != curve.controlPointIDs.end())
                         {
                             curve.controlPointIDs.erase(std::remove(curve.controlPointIDs.begin(), curve.controlPointIDs.end(), sceneObjects[i].id), curve.controlPointIDs.end());
@@ -717,7 +788,7 @@ int main()
         {
             if (obj.isSelected) 
             {
-                if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2)
+                if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2 || obj.type == objects::ObjectType::InterpolatingCurveC2)
                 {
                     int ptCount = 0;
                     pmath::Vec3 curveCenter(0.0f, 0.0f, 0.0f);
@@ -1062,6 +1133,169 @@ int main()
                     glBindVertexArray(0);
                 }
             }
+            else if (obj.type == objects::ObjectType::InterpolatingCurveC2)
+            {
+                if (obj.needsUpdate || obj.VAO == 0)
+                {
+                    std::vector<pmath::Vec3> pts;
+                    for (uint32_t ptID : obj.controlPointIDs)
+                    {
+                        for (const auto& otherObj : sceneObjects)
+                        {
+                            if (otherObj.id == ptID && otherObj.type == objects::ObjectType::Point)
+                            {
+                                pts.push_back(pmath::Vec3(otherObj.transform.m[0][3], otherObj.transform.m[1][3], otherObj.transform.m[2][3]));
+                                break;
+                            }
+                        }
+                    }
+
+                    int n = pts.size();
+                    if (n >= 2)
+                    {
+                        // 1. Obliczenie odleg³oœci (ciêciw) miêdzy wêz³ami
+                        std::vector<float> d(n - 1);
+                        for (int i = 0; i < n - 1; ++i)
+                        {
+                            d[i] = (pts[i + 1] - pts[i]).length();
+                            if (d[i] < 0.0001f) d[i] = 0.0001f; // Zabezpieczenie przed dzieleniem przez zero
+                        }
+
+                        // 2. Przygotowanie wektorów dla macierzy trójdiagonalnej
+                        std::vector<float> a(n, 0.0f); // Pod przek¹tn¹
+                        std::vector<float> b(n, 0.0f); // G³ówna przek¹tna
+                        std::vector<float> c(n, 0.0f); // Nad przek¹tn¹
+                        std::vector<pmath::Vec3> r(n, pmath::Vec3(0.0f, 0.0f, 0.0f)); // Wektor wyników
+
+                        // Warunek brzegowy dla i = 0
+                        b[0] = 2.0f;
+                        c[0] = 1.0f;
+                        r[0] = (pts[1] - pts[0]) * (3.0f / d[0]);
+
+                        // Równania dla punktów wewnêtrznych (i = 1 ... n-2)
+                        for (int i = 1; i < n - 1; ++i)
+                        {
+                            a[i] = d[i];
+                            b[i] = 2.0f * (d[i - 1] + d[i]);
+                            c[i] = d[i - 1];
+                            pmath::Vec3 term1 = (pts[i] - pts[i - 1]) * (d[i] / d[i - 1]);
+                            pmath::Vec3 term2 = (pts[i + 1] - pts[i]) * (d[i - 1] / d[i]);
+                            r[i] = (term1 + term2) * 3.0f;
+                        }
+
+                        // Warunek brzegowy dla i = n - 1
+                        a[n - 1] = 1.0f;
+                        b[n - 1] = 2.0f;
+                        r[n - 1] = (pts[n - 1] - pts[n - 2]) * (3.0f / d[n - 2]);
+
+                        // 3. Algorytm Thomasa (Rozwi¹zanie uk³adu trójdiagonalnego w czasie liniowym)
+                        std::vector<float> c_prime(n, 0.0f);
+                        std::vector<pmath::Vec3> r_prime(n, pmath::Vec3(0.0f, 0.0f, 0.0f));
+                        std::vector<pmath::Vec3> T(n, pmath::Vec3(0.0f, 0.0f, 0.0f)); // Nasze wektory styczne
+
+                        c_prime[0] = c[0] / b[0];
+                        r_prime[0] = r[0] * (1.0f / b[0]);
+
+                        for (int i = 1; i < n; ++i)
+                        {
+                            float m = b[i] - a[i] * c_prime[i - 1];
+                            if (i < n - 1) c_prime[i] = c[i] / m;
+                            r_prime[i] = (r[i] - r_prime[i - 1] * a[i]) * (1.0f / m);
+                        }
+
+                        T[n - 1] = r_prime[n - 1];
+                        for (int i = n - 2; i >= 0; --i)
+                        {
+                            T[i] = r_prime[i] - T[i + 1] * c_prime[i];
+                        }
+
+                        // 4. Konwersja wektorów stycznych na punkty kontrolne segmentów Beziera
+                        obj.interpolatedBezierPoints.clear();
+                        for (int i = 0; i < n - 1; ++i)
+                        {
+                            pmath::Vec3 B0 = pts[i];
+                            pmath::Vec3 B1 = pts[i] + T[i] * (d[i] / 3.0f);
+                            pmath::Vec3 B2 = pts[i + 1] - T[i + 1] * (d[i] / 3.0f);
+                            pmath::Vec3 B3 = pts[i + 1];
+
+                            obj.interpolatedBezierPoints.push_back(B0);
+                            obj.interpolatedBezierPoints.push_back(B1);
+                            obj.interpolatedBezierPoints.push_back(B2);
+                            obj.interpolatedBezierPoints.push_back(B3);
+                        }
+                    }
+                    else
+                    {
+                        obj.interpolatedBezierPoints.clear();
+                    }
+
+                    // 5. Przygotowanie buforów VBO/EBO dla GPU
+                    if (obj.VAO == 0)
+                    {
+                        glGenVertexArrays(1, &obj.VAO);
+                        glGenBuffers(1, &obj.VBO);
+                        glGenBuffers(1, &obj.EBO);
+                    }
+
+                    std::vector<float> vboData;
+                    std::vector<unsigned int> patchIndices;
+
+                    for (size_t i = 0; i < obj.interpolatedBezierPoints.size(); ++i)
+                    {
+                        vboData.push_back(obj.interpolatedBezierPoints[i].x);
+                        vboData.push_back(obj.interpolatedBezierPoints[i].y);
+                        vboData.push_back(obj.interpolatedBezierPoints[i].z);
+                        patchIndices.push_back(i);
+                    }
+
+                    glBindVertexArray(obj.VAO);
+                    glBindBuffer(GL_ARRAY_BUFFER, obj.VBO);
+                    glBufferData(GL_ARRAY_BUFFER, vboData.size() * sizeof(float), vboData.data(), GL_STATIC_DRAW);
+
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj.EBO);
+                    glBufferData(GL_ELEMENT_ARRAY_BUFFER, patchIndices.size() * sizeof(unsigned int), patchIndices.data(), GL_STATIC_DRAW);
+
+                    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+                    glEnableVertexAttribArray(0);
+                    glBindVertexArray(0);
+
+                    obj.curveIndexCount = patchIndices.size();
+                    obj.needsUpdate = false;
+                }
+
+                // 6. Rysowanie krzywej
+                pmath::Mat4 curveModel = sceneModel;
+
+                // Opcjonalne rysowanie polilinii kontrolnej (pomarañczowej dla wgl¹du)
+                if (obj.showPolyline && obj.curveIndexCount > 0)
+                {
+                    shaderProgram.use();
+                    shaderProgram.setMat4("model", curveModel);
+                    shaderProgram.setVec3("uColor", 0.9f, 0.6f, 0.2f);
+
+                    glBindVertexArray(obj.VAO);
+                    glDrawElements(GL_LINE_STRIP, obj.curveIndexCount, GL_UNSIGNED_INT, 0);
+                    glBindVertexArray(0);
+                }
+
+                // Generowanie w³aœciwej geometrii krzywej 
+                if (obj.curveIndexCount > 0)
+                {
+                    bezierShader.use();
+                    bezierShader.setMat4("model", curveModel);
+                    bezierShader.setMat4("view", view);
+                    bezierShader.setMat4("projection", projection);
+                    bezierShader.setVec3("screenSize", pmath::Vec3((float)display_w, (float)display_h, 0.0f));
+
+                    if (obj.isSelected) bezierShader.setVec3("uColor", 0.4f, 1.0f, 0.4f); // Zielonkawy kolor zaznaczenia dla C2
+                    else bezierShader.setVec3("uColor", 0.2f, 0.8f, 0.2f);
+
+                    glBindVertexArray(obj.VAO);
+                    glPatchParameteri(GL_PATCH_VERTICES, 4);
+                    glDrawElements(GL_PATCHES, obj.curveIndexCount, GL_UNSIGNED_INT, 0);
+                    glBindVertexArray(0);
+                }
+            }
         }
 
         // glfw: swap buffers
@@ -1139,7 +1373,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
                     if (obj.isSelected)
                     {
                         obj.initialTransform = obj.transform;
-                        if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2)
+                        if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2 || obj.type == objects::ObjectType::InterpolatingCurveC2)
                         {
                             for (uint32_t ptID : obj.controlPointIDs)
                             {
@@ -1254,7 +1488,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
                 delta.scale(factor, factor, factor);
                 delta.shift(pivot.x, pivot.y, pivot.z);
 
-                if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2)
+                if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2 || obj.type == objects::ObjectType::InterpolatingCurveC2)
                 {
                     for (auto& otherObj : sceneObjects) 
                     {
@@ -1275,7 +1509,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
                 {
                     for (auto& curve : sceneObjects)
                     {
-                        if ((curve.type == objects::ObjectType::BezierCurveC0 || curve.type == objects::ObjectType::BezierCurveC2)
+                        if ((curve.type == objects::ObjectType::BezierCurveC0 || curve.type == objects::ObjectType::BezierCurveC2 || curve.type == objects::ObjectType::InterpolatingCurveC2)
                             && std::find(curve.controlPointIDs.begin(), curve.controlPointIDs.end(), obj.id) != curve.controlPointIDs.end())
                         {
                             curve.needsUpdate = true;
@@ -1319,7 +1553,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 
                 delta.shift(pivot.x, pivot.y, pivot.z);
 
-                if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2)
+                if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2 || obj.type == objects::ObjectType::InterpolatingCurveC2)
                 {
                     for (auto& otherObj : sceneObjects) 
                     {
@@ -1340,7 +1574,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
                 {
                     for (auto& curve : sceneObjects)
                     {
-                        if ((curve.type == objects::ObjectType::BezierCurveC0 || curve.type == objects::ObjectType::BezierCurveC2)
+                        if ((curve.type == objects::ObjectType::BezierCurveC0 || curve.type == objects::ObjectType::BezierCurveC2 || curve.type == objects::ObjectType::InterpolatingCurveC2)
                             && std::find(curve.controlPointIDs.begin(), curve.controlPointIDs.end(), obj.id) != curve.controlPointIDs.end())
                         {
                             curve.needsUpdate = true;
@@ -1407,7 +1641,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
                 pmath::Mat4 delta;
                 delta.shift(worldMoveDir.x, worldMoveDir.y, worldMoveDir.z);
 
-                if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2)
+                if (obj.type == objects::ObjectType::BezierCurveC0 || obj.type == objects::ObjectType::BezierCurveC2 || obj.type == objects::ObjectType::InterpolatingCurveC2)
                 {
                     for (auto& otherObj : sceneObjects) 
                     {
@@ -1428,7 +1662,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
                 {
                     for (auto& curve : sceneObjects)
                     {
-                        if ((curve.type == objects::ObjectType::BezierCurveC0 || curve.type == objects::ObjectType::BezierCurveC2)
+                        if ((curve.type == objects::ObjectType::BezierCurveC0 || curve.type == objects::ObjectType::BezierCurveC2 || curve.type == objects::ObjectType::InterpolatingCurveC2)
                             && std::find(curve.controlPointIDs.begin(), curve.controlPointIDs.end(), obj.id) != curve.controlPointIDs.end())
                         {
                             curve.needsUpdate = true;

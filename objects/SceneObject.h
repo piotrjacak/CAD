@@ -2,15 +2,7 @@
 #include <vector>
 
 namespace objects {
-    enum class ObjectType { Torus, Point, BezierCurveC0, BezierCurveC2 };
-
-  //  enum class CurveBasis { Bernstein, BSpline };
-
-  //  struct VirtualPoint {
-		//pmath::Mat4 transform;
-		//pmath::Mat4 initialTransform;
-		//bool isSelected = false;
-  //  };
+    enum class ObjectType { Torus, Point, BezierCurveC0, BezierCurveC2, InterpolatingCurveC2 };
 
     struct SceneObject {
 		uint32_t id;
@@ -41,5 +33,7 @@ namespace objects {
         // Bspline Bezier virtual points
         std::vector<pmath::Vec3> virtualPoints;
         int selectedVirtualPointIndex = -1;
+
+        std::vector<pmath::Vec3> interpolatedBezierPoints;
     };
 }
