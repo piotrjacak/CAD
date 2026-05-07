@@ -8,7 +8,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "pmath/pmath.h"
+#include "core/pmath/pmath.h"
 
 class Shader
 {

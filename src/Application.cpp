@@ -1,5 +1,4 @@
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
+#include "Application.h"
 #include <iostream>
 #include <cmath>
 
@@ -7,109 +6,54 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/imgui.h"
 
-#include "pmath/pmath.h"
 #include "matrices.h"
 #include "shader.h"
 #include "objects/Torus.h"
-#include "objects/SceneObject.h"
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow* window);
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
-void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
-
-enum class PivotType { Local, Median, Cursor };
-enum class RotationAxis { Free, X, Y, Z };
-
-// GLOBAL VARIABLES
 const unsigned int SCR_WIDTH = 1800;
 const unsigned int SCR_HEIGHT = 1200;
-//const unsigned int SCR_WIDTH = 1600;
-//const unsigned int SCR_HEIGHT = 1000;
 
-// Speed variables
-float SCROLL_SPEED = 0.1f;
-float SCREEN_SCALE = 1.0f;
-float PAN_SPEED = 0.0025f;
-float ROTATE_SPEED = 0.005f;
+Application::Application() {
+    cursorVertices = {
+        0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        0.9f, 0.1f, 0.0f, 1.0f, 0.0f, 0.0f,
+        0.9f, -0.1f, 0.0f, 1.0f, 0.0f, 0.0f,
 
-// Scene variables
-float ROT_X = 0.0f;
-float ROT_Y = 0.0f;
-float SHIFT_X = 0.0f;
-float SHIFT_Y = 0.0f;
+        0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        -0.1f, 0.9f, 0.0f, 0.0f, 1.0f, 0.0f,
+         0.1f, 0.9f, 0.0f, 0.0f, 1.0f, 0.0f,
 
-// Control variables
-bool CAM_ROTATE_ACTIVE = false;     // Alt + LMB
-bool CAM_PAN_ACTIVE = false;        // Alt + RMB
-bool LMB_PRESSED = false;           // LMB
-bool RMB_PRESSED = false;           // RMB
-bool SET_CURSOR_FLAG = false;       // Shift + RMB
-bool PROCESS_SELECTION = false; 
-bool MULTI_SELECT = false;          // CTRL
-bool OBJ_SCALE_ACTIVE = false;      // S + LPM
-bool OBJ_ROTATE_ACTIVE = false;     // R + LPM
-bool OBJ_TRANSLATE_ACTIVE = false;  // T + LPM
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+        0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+        -0.1f, 0.0f, 0.9f, 0.0f, 0.0f, 1.0f,
+        0.1f, 0.0f, 0.9f, 0.0f, 0.0f, 1.0f
+    };
+    cursorIndices = {
+        0, 1, 1, 2, 1, 3, 4, 5, 5, 6, 5, 7, 8, 9, 9, 10, 9, 11
+    };
+    window = nullptr;
+}
 
-// Position variables
-double TARGET_CURSOR_X = 0.0;
-double TARGET_CURSOR_Y = 0.0;
-double LAST_MOUSE_X = 0.0;
-double LAST_MOUSE_Y = 0.0;
-double START_MOUSE_X = 0.0;
-double START_MOUSE_Y = 0.0;
-double SELECT_MOUSE_X = 0.0;
-double SELECT_MOUSE_Y = 0.0;
+Application::~Application() {
+    if (window) {
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+        glfwDestroyWindow(window);
+        glfwTerminate();
+    }
+}
 
-PivotType CURRENT_PIVOT = PivotType::Local;
-RotationAxis CURRENT_ROT_AXIS = RotationAxis::Free;
+int Application::run() {
 
-float cursorX = 0.0f, cursorY = 0.0f, cursorZ = 0.0f;
-pmath::Vec3 medianPoint(0.0f, 0.0f, 0.0f);
-pmath::Vec3 pivotPoint(0.0f, 0.0f, 0.0f);
-
-std::vector<objects::SceneObject> sceneObjects;
-int torusCounter = 1;
-int pointCounter = 1;
-int bezierC0Counter = 1;
-int bezierC2Counter = 1;
-int interpC2Counter = 1;
-uint32_t globalObjectIdCounter = 1;
-
-std::vector<float> cursorVertices = {
-    0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-    1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-    0.9f, 0.1f, 0.0f, 1.0f, 0.0f, 0.0f,
-    0.9f, -0.1f, 0.0f, 1.0f, 0.0f, 0.0f,
-
-    0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-    -0.1f, 0.9f, 0.0f, 0.0f, 1.0f, 0.0f,
-     0.1f, 0.9f, 0.0f, 0.0f, 1.0f, 0.0f,
-
-    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-    0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-    -0.1f, 0.0f, 0.9f, 0.0f, 0.0f, 1.0f,
-    0.1f, 0.0f, 0.9f, 0.0f, 0.0f, 1.0f
-};
-std::vector<unsigned int> cursorIndices = {
-    0, 1, 1, 2, 1, 3, 4, 5, 5, 6, 5, 7, 8, 9, 9, 10, 9, 11
-};
-
-float default_R = 1.0f;
-float default_r = 0.3f;
-int default_meshAcc = 64;
-
-
-int main()
-{
 	// -- BOILERPLATE CODE --
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "CAD", NULL, NULL);
+    window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "CAD", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -117,6 +61,7 @@ int main()
         return -1;
     }
     glfwMakeContextCurrent(window);
+    glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -137,9 +82,9 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
     // High resolution screen setting
-    //float scale_factor = 1.5f;
-    //ImGui::GetStyle().ScaleAllSizes(scale_factor);
-    //io.FontGlobalScale = scale_factor;
+    // float scale_factor = 1.5f;
+    // ImGui::GetStyle().ScaleAllSizes(scale_factor);
+    // io.FontGlobalScale = scale_factor;
 	// -- END OF BOILERPLATE CODE --
 
 
@@ -315,7 +260,7 @@ int main()
             ImGui::Text("Selected Bezier Curve C2 Options");
             if (ImGui::Checkbox("Show polyline", &selectedBezierC2->showPolyline)) {}
 
-            // Prze³¹cznik bazy
+            // Przeï¿½ï¿½cznik bazy
             int basis = selectedBezierC2->isBsplineBasis ? 0 : 1;
             ImGui::Text("Curve Basis:");
             if (ImGui::RadioButton("B-spline", &basis, 0)) selectedBezierC2->isBsplineBasis = true;
@@ -1153,7 +1098,7 @@ int main()
                     int n = pts.size();
                     if (n >= 2)
                     {
-                        // 1. Obliczenie odleg³oœci (ciêciw) miêdzy wêz³ami
+                        // 1. Obliczenie odlegï¿½oï¿½ci (ciï¿½ciw) miï¿½dzy wï¿½zï¿½ami
                         std::vector<float> d(n - 1);
                         for (int i = 0; i < n - 1; ++i)
                         {
@@ -1161,18 +1106,18 @@ int main()
                             if (d[i] < 0.0001f) d[i] = 0.0001f; // Zabezpieczenie przed dzieleniem przez zero
                         }
 
-                        // 2. Przygotowanie wektorów dla macierzy trójdiagonalnej
-                        std::vector<float> a(n, 0.0f); // Pod przek¹tn¹
-                        std::vector<float> b(n, 0.0f); // G³ówna przek¹tna
-                        std::vector<float> c(n, 0.0f); // Nad przek¹tn¹
-                        std::vector<pmath::Vec3> r(n, pmath::Vec3(0.0f, 0.0f, 0.0f)); // Wektor wyników
+                        // 2. Przygotowanie wektorï¿½w dla macierzy trï¿½jdiagonalnej
+                        std::vector<float> a(n, 0.0f); // Pod przekï¿½tnï¿½
+                        std::vector<float> b(n, 0.0f); // Gï¿½ï¿½wna przekï¿½tna
+                        std::vector<float> c(n, 0.0f); // Nad przekï¿½tnï¿½
+                        std::vector<pmath::Vec3> r(n, pmath::Vec3(0.0f, 0.0f, 0.0f)); // Wektor wynikï¿½w
 
                         // Warunek brzegowy dla i = 0
                         b[0] = 2.0f;
                         c[0] = 1.0f;
                         r[0] = (pts[1] - pts[0]) * (3.0f / d[0]);
 
-                        // Równania dla punktów wewnêtrznych (i = 1 ... n-2)
+                        // Rï¿½wnania dla punktï¿½w wewnï¿½trznych (i = 1 ... n-2)
                         for (int i = 1; i < n - 1; ++i)
                         {
                             a[i] = d[i];
@@ -1188,7 +1133,7 @@ int main()
                         b[n - 1] = 2.0f;
                         r[n - 1] = (pts[n - 1] - pts[n - 2]) * (3.0f / d[n - 2]);
 
-                        // 3. Algorytm Thomasa (Rozwi¹zanie uk³adu trójdiagonalnego w czasie liniowym)
+                        // 3. Algorytm Thomasa (Rozwiï¿½zanie ukï¿½adu trï¿½jdiagonalnego w czasie liniowym)
                         std::vector<float> c_prime(n, 0.0f);
                         std::vector<pmath::Vec3> r_prime(n, pmath::Vec3(0.0f, 0.0f, 0.0f));
                         std::vector<pmath::Vec3> T(n, pmath::Vec3(0.0f, 0.0f, 0.0f)); // Nasze wektory styczne
@@ -1209,7 +1154,7 @@ int main()
                             T[i] = r_prime[i] - T[i + 1] * c_prime[i];
                         }
 
-                        // 4. Konwersja wektorów stycznych na punkty kontrolne segmentów Beziera
+                        // 4. Konwersja wektorï¿½w stycznych na punkty kontrolne segmentï¿½w Beziera
                         obj.interpolatedBezierPoints.clear();
                         for (int i = 0; i < n - 1; ++i)
                         {
@@ -1229,7 +1174,7 @@ int main()
                         obj.interpolatedBezierPoints.clear();
                     }
 
-                    // 5. Przygotowanie buforów VBO/EBO dla GPU
+                    // 5. Przygotowanie buforï¿½w VBO/EBO dla GPU
                     if (obj.VAO == 0)
                     {
                         glGenVertexArrays(1, &obj.VAO);
@@ -1266,7 +1211,7 @@ int main()
                 // 6. Rysowanie krzywej
                 pmath::Mat4 curveModel = sceneModel;
 
-                // Opcjonalne rysowanie polilinii kontrolnej (pomarañczowej dla wgl¹du)
+                // Opcjonalne rysowanie polilinii kontrolnej (pomaraï¿½czowej dla wglï¿½du)
                 if (obj.showPolyline && obj.curveIndexCount > 0)
                 {
                     shaderProgram.use();
@@ -1278,7 +1223,7 @@ int main()
                     glBindVertexArray(0);
                 }
 
-                // Generowanie w³aœciwej geometrii krzywej 
+                // Generowanie wï¿½aï¿½ciwej geometrii krzywej 
                 if (obj.curveIndexCount > 0)
                 {
                     bezierShader.use();
@@ -1304,25 +1249,20 @@ int main()
         glfwPollEvents();
     }
 
-    glfwTerminate();
     return 0;
 }
-
-
-
-
-void processInput(GLFWwindow* window)
+void Application::processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 }
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void Application::framebuffer_size_callback_impl(int width, int height)
 {
     glViewport(0, 0, width, height);
 }
 
 // GLFW scroll handling
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+void Application::scroll_callback_impl(double xoffset, double yoffset)
 {
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantCaptureMouse) return;
@@ -1339,7 +1279,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 }
 
 // GLFW mouse button handling
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+void Application::mouse_button_callback_impl(int button, int action, int mods)
 {
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantCaptureMouse) return;
@@ -1443,7 +1383,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 }
 
 // GLFW mouse movement handling
-void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
+void Application::cursor_position_callback_impl(double xpos, double ypos)
 {
 	double objectDeltaX = xpos - START_MOUSE_X;
 	double objectDeltaY = ypos - START_MOUSE_Y;
@@ -1677,4 +1617,21 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
             }
         }
     }
+}
+
+void Application::scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    if (app) app->scroll_callback_impl(xoffset, yoffset);
+}
+void Application::mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    if (app) app->mouse_button_callback_impl(button, action, mods);
+}
+void Application::cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
+    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    if (app) app->cursor_position_callback_impl(xpos, ypos);
+}
+void Application::framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    if (app) app->framebuffer_size_callback_impl(width, height);
 }
