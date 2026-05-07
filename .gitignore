@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+src/imgui.ini
+src/cad.exe
+.claude/settings.local.json
+src/imgui.ini
+src/imgui.ini
+src/cad.exe
