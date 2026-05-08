@@ -2,6 +2,7 @@
 
 #include "Scene.h"
 #include "InputHandler.h"
+#include "StereoParams.h"
 
 struct UIResult {
     bool screenCursorChanged = false;
@@ -14,5 +15,6 @@ public:
                     float& screenCursorX, float& screenCursorY,
                     PivotType& pivot, RotationAxis& rotAxis,
                     float default_R, float default_r, int default_meshAcc,
-                    int displayW, int displayH);
+                    int displayW, int displayH,
+                    StereoParams& stereo);
 };

@@ -76,7 +76,8 @@ int Application::run() {
             screenCursorX, screenCursorY,
             inputHandler.CURRENT_PIVOT, inputHandler.CURRENT_ROT_AXIS,
             default_R, default_r, default_meshAcc,
-            display_w, display_h);
+            display_w, display_h,
+            stereoParams);
 
         // Scene matrices
         pmath::Mat4 sceneModel;
@@ -148,10 +149,19 @@ int Application::run() {
         if (selectedCount > 0)
             medianPoint = medianPoint * (1.0f / static_cast<float>(selectedCount));
 
-        renderer.renderFrame(scene, sceneModel, view, projection,
-            display_w, display_h,
-            pmath::Vec3(cursorX, cursorY, cursorZ),
-            medianPoint, selectedCount > 0);
+        if (stereoParams.enabled) {
+            renderer.renderFrameStereo(scene, sceneModel, view,
+                display_w, display_h,
+                pmath::Vec3(cursorX, cursorY, cursorZ),
+                medianPoint, selectedCount > 0,
+                stereoParams,
+                aspect, pmath::degToRad(45.0f), 0.1f, 100.0f);
+        } else {
+            renderer.renderFrame(scene, sceneModel, view, projection,
+                display_w, display_h,
+                pmath::Vec3(cursorX, cursorY, cursorZ),
+                medianPoint, selectedCount > 0);
+        }
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);

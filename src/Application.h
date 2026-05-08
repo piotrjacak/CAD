@@ -27,6 +27,7 @@ private:
     Renderer     renderer;
     InputHandler inputHandler;
     UI           ui;
+    StereoParams stereoParams;
 
     float default_R = 1.0f;
     float default_r = 0.3f;

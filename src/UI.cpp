@@ -16,7 +16,8 @@ UIResult UI::render(Scene& scene,
                     float& screenCursorX, float& screenCursorY,
                     PivotType& pivot, RotationAxis& rotAxis,
                     float default_R, float default_r, int default_meshAcc,
-                    int displayW, int displayH)
+                    int displayW, int displayH,
+                    StereoParams& stereo)
 {
     UIResult result;
 
@@ -269,6 +270,15 @@ UIResult UI::render(Scene& scene,
     ImGui::RadioButton("Y", &rotAxisInt, 2); ImGui::SameLine();
     ImGui::RadioButton("Z", &rotAxisInt, 3);
     rotAxis = (RotationAxis)rotAxisInt;
+
+    // Stereo
+    ImGui::Separator();
+    ImGui::Text("Stereoscopic Rendering");
+    ImGui::Checkbox("Enable Anaglyph (Red-Cyan)", &stereo.enabled);
+    if (stereo.enabled) {
+        ImGui::SliderFloat("Eye Separation",      &stereo.eyeSep,      0.001f, 0.5f);
+        ImGui::SliderFloat("Convergence Distance", &stereo.convergence, 0.5f,  20.0f);
+    }
 
     ImGui::End();
     ImGui::Render();
