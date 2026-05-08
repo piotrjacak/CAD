@@ -2,7 +2,7 @@
 
 #include <cmath>
 #include <vector>
-#include "../pmath/Utils.h"
+#include "../core/pmath/Utils.h"
 
 namespace objects {
 	struct Torus
