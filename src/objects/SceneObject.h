@@ -9,7 +9,9 @@ class Shader;
 
 namespace objects {
 
-enum class ObjectType { Torus, Point, BezierCurveC0, BezierCurveC2, InterpolatingCurveC2 };
+class PointObject;
+
+enum class ObjectType { Torus, Point, BezierCurveC0, BezierCurveC2, InterpolatingCurveC2, BezierSurfaceC0 };
 
 struct RenderContext {
     pmath::Mat4 sceneModel;
@@ -19,6 +21,7 @@ struct RenderContext {
     int displayH = 0;
     Shader* shaderProgram = nullptr;
     Shader* bezierShader = nullptr;
+    Shader* bezierSurfaceC0Shader = nullptr;
     unsigned int sharedPointVAO = 0;
 };
 
@@ -39,6 +42,7 @@ public:
     virtual void render(const RenderContext& ctx) = 0;
     virtual pmath::Vec3 getCenter() const;
     virtual float getPickRadius() const = 0;
+    virtual std::vector<std::weak_ptr<PointObject>>* getControlPointsList() { return nullptr; }
 
 protected:
     unsigned int VAO = 0;

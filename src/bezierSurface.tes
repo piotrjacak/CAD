@@ -1,0 +1,54 @@
+#version 400 core
+
+layout (isolines, equal_spacing, ccw) in;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int tessLevel;
+uniform int orientation;
+
+void main()
+{
+    // isolines emituje linie na y = i / outer[0] dla i = 0..outer[0]-1,
+    // czyli zakres [0, T/(T+1)]. Przeskalowujemy do [0, 1] aby ostatnia
+    // linia trafila dokladnie na krawedz v=1 (lub u=1).
+    float T = float(tessLevel);
+    float yScaled = gl_TessCoord.y * (T + 1.0) / T;
+
+    float u, v;
+    if (orientation == 0) {
+        u = gl_TessCoord.x;
+        v = yScaled;
+    } else {
+        u = yScaled;
+        v = gl_TessCoord.x;
+    }
+
+    float iu = 1.0 - u;
+    float iv = 1.0 - v;
+
+    // Bernstein 3 stopnia
+    float Bu[4];
+    Bu[0] = iu * iu * iu;
+    Bu[1] = 3.0 * iu * iu * u;
+    Bu[2] = 3.0 * iu * u  * u;
+    Bu[3] = u  * u  * u;
+
+    float Bv[4];
+    Bv[0] = iv * iv * iv;
+    Bv[1] = 3.0 * iv * iv * v;
+    Bv[2] = 3.0 * iv * v  * v;
+    Bv[3] = v  * v  * v;
+
+    // Ewaluacja P(u,v) = sum_{i,j} Bu_i * Bv_j * P_{i,j}
+    // Layout: gl_in[j * 4 + i] gdzie i = U (kolumna), j = V (wiersz).
+    vec4 pos = vec4(0.0);
+    for (int j = 0; j < 4; ++j) {
+        for (int i = 0; i < 4; ++i) {
+            pos += Bu[i] * Bv[j] * gl_in[j * 4 + i].gl_Position;
+        }
+    }
+
+    gl_Position = projection * view * model * pos;
+}

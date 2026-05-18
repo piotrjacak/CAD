@@ -1,0 +1,49 @@
+#version 400 core
+
+layout (vertices = 16) out;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform vec3 screenSize;
+uniform int tessLevel;
+uniform int orientation;
+
+void main()
+{
+    gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
+
+    if (gl_InvocationID == 0)
+    {
+        // Rzutowanie 4 naroznikow patcha na ekran (indeksy 0, 3, 12, 15)
+        vec4 c0 = projection * view * model * gl_in[0].gl_Position;   c0 /= c0.w;
+        vec4 c1 = projection * view * model * gl_in[3].gl_Position;   c1 /= c1.w;
+        vec4 c2 = projection * view * model * gl_in[12].gl_Position;  c2 /= c2.w;
+        vec4 c3 = projection * view * model * gl_in[15].gl_Position;  c3 /= c3.w;
+
+        c0.xy = (c0.xy * 0.5 + 0.5) * screenSize.xy;
+        c1.xy = (c1.xy * 0.5 + 0.5) * screenSize.xy;
+        c2.xy = (c2.xy * 0.5 + 0.5) * screenSize.xy;
+        c3.xy = (c3.xy * 0.5 + 0.5) * screenSize.xy;
+
+        // Dlugosci krawedzi patcha w pikselach
+        float lenU0 = distance(c0.xy, c1.xy); // krawedz v=0
+        float lenU1 = distance(c2.xy, c3.xy); // krawedz v=1
+        float lenV0 = distance(c0.xy, c2.xy); // krawedz u=0
+        float lenV1 = distance(c1.xy, c3.xy); // krawedz u=1
+
+        float lenAlong;
+        if (orientation == 0) {
+            // linie stalego v, parametr u biegnie wzdluz linii
+            lenAlong = max(lenU0, lenU1);
+        } else {
+            // linie stalego u, parametr v biegnie wzdluz linii
+            lenAlong = max(lenV0, lenV1);
+        }
+
+        // liczba linii izoparametrycznych (tessLevel podzialow -> tessLevel+1 linii)
+        gl_TessLevelOuter[0] = float(tessLevel + 1);
+        // gestosc probkowania kazdej linii (heurystyka pikselowa)
+        gl_TessLevelOuter[1] = clamp(lenAlong, 8.0, 64.0);
+    }
+}

@@ -42,8 +42,8 @@ void InputHandler::onMouseButton(int button, int action, int mods,
                 for (auto& [id, obj] : scene.objects) {
                     if (obj->isSelected) {
                         obj->initialTransform = obj->transform;
-                        if (auto* curve = dynamic_cast<objects::CurveObject*>(obj.get()))
-                            for (auto& wp : curve->controlPoints)
+                        if (auto* cps = obj->getControlPointsList())
+                            for (auto& wp : *cps)
                                 if (auto pt = wp.lock())
                                     pt->initialTransform = pt->transform;
                     }
@@ -124,18 +124,18 @@ void InputHandler::onCursorPos(double xpos, double ypos, Scene& scene) {
             delta.scale(factor, factor, factor);
             delta.shift(pivot.x, pivot.y, pivot.z);
 
-            if (auto* curve = dynamic_cast<objects::CurveObject*>(obj.get())) {
-                for (auto& wp : curve->controlPoints)
+            if (auto* cps = obj->getControlPointsList()) {
+                for (auto& wp : *cps)
                     if (auto pt = wp.lock())
                         pt->transform = delta * pt->initialTransform;
                 obj->needsUpdate = true;
             }
             else if (obj->getType() == objects::ObjectType::Point) {
                 for (auto& [cid, c] : scene.objects)
-                    if (auto* cv = dynamic_cast<objects::CurveObject*>(c.get()))
-                        for (auto& wp : cv->controlPoints)
+                    if (auto* otherCps = c->getControlPointsList())
+                        for (auto& wp : *otherCps)
                             if (auto pt = wp.lock(); pt && pt->id == obj->id)
-                                { cv->needsUpdate = true; break; }
+                                { c->needsUpdate = true; break; }
                 obj->transform = delta * obj->initialTransform;
             }
             else {
@@ -163,18 +163,18 @@ void InputHandler::onCursorPos(double xpos, double ypos, Scene& scene) {
             else if (CURRENT_ROT_AXIS == RotationAxis::Z)    delta.rotateZ(combinedAngle);
             delta.shift(pivot.x, pivot.y, pivot.z);
 
-            if (auto* curve = dynamic_cast<objects::CurveObject*>(obj.get())) {
-                for (auto& wp : curve->controlPoints)
+            if (auto* cps = obj->getControlPointsList()) {
+                for (auto& wp : *cps)
                     if (auto pt = wp.lock())
                         pt->transform = delta * pt->initialTransform;
                 obj->needsUpdate = true;
             }
             else if (obj->getType() == objects::ObjectType::Point) {
                 for (auto& [cid, c] : scene.objects)
-                    if (auto* cv = dynamic_cast<objects::CurveObject*>(c.get()))
-                        for (auto& wp : cv->controlPoints)
+                    if (auto* otherCps = c->getControlPointsList())
+                        for (auto& wp : *otherCps)
                             if (auto pt = wp.lock(); pt && pt->id == obj->id)
-                                { cv->needsUpdate = true; break; }
+                                { c->needsUpdate = true; break; }
                 obj->transform = delta * obj->initialTransform;
             }
             else {
@@ -218,18 +218,18 @@ void InputHandler::onCursorPos(double xpos, double ypos, Scene& scene) {
             pmath::Mat4 delta;
             delta.shift(worldMoveDir.x, worldMoveDir.y, worldMoveDir.z);
 
-            if (auto* curve = dynamic_cast<objects::CurveObject*>(obj.get())) {
-                for (auto& wp : curve->controlPoints)
+            if (auto* cps = obj->getControlPointsList()) {
+                for (auto& wp : *cps)
                     if (auto pt = wp.lock(); pt && !pt->isSelected)
                         pt->transform = delta * pt->initialTransform;
                 obj->needsUpdate = true;
             }
             else if (obj->getType() == objects::ObjectType::Point) {
                 for (auto& [cid, c] : scene.objects)
-                    if (auto* cv = dynamic_cast<objects::CurveObject*>(c.get()))
-                        for (auto& wp : cv->controlPoints)
+                    if (auto* otherCps = c->getControlPointsList())
+                        for (auto& wp : *otherCps)
                             if (auto pt = wp.lock(); pt && pt->id == obj->id)
-                                { cv->needsUpdate = true; break; }
+                                { c->needsUpdate = true; break; }
                 obj->transform = delta * obj->initialTransform;
             }
             else {

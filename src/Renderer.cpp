@@ -8,6 +8,8 @@ void Renderer::init() {
     cursorShader    = std::make_unique<Shader>("cursorShader.vs", "cursorShader.fs");
     bezierShader    = std::make_unique<Shader>("bezierShader.vs", "bezierShader.fs",
                                                "bezierShader.tcs", "bezierShader.tes");
+    bezierSurfaceC0Shader = std::make_unique<Shader>("bezierSurface.vs", "bezierSurface.fs",
+                                                     "bezierSurfaceC0.tcs", "bezierSurface.tes");
     compositeShader = std::make_unique<Shader>("anaglyphComposite.vs", "anaglyphComposite.fs");
 
     compositeShader->use();
@@ -174,9 +176,10 @@ void Renderer::renderSceneGeometry(
     ctx.projection     = projection;
     ctx.displayW       = displayW;
     ctx.displayH       = displayH;
-    ctx.shaderProgram  = shaderProgram.get();
-    ctx.bezierShader   = bezierShader.get();
-    ctx.sharedPointVAO = pointVAO;
+    ctx.shaderProgram         = shaderProgram.get();
+    ctx.bezierShader          = bezierShader.get();
+    ctx.bezierSurfaceC0Shader = bezierSurfaceC0Shader.get();
+    ctx.sharedPointVAO        = pointVAO;
 
     for (auto& [id, obj] : scene.objects)
     {
@@ -217,31 +220,31 @@ void Renderer::renderFrameStereo(
 
     float halfEye = stereo.eyeSep / 2.0f;
 
-    // Lewe oko: kamera przesunięta w lewo (world x = -halfEye)
+    // Lewe oko
     pmath::Mat4 viewLeft;
     viewLeft.shift(+halfEye, 0.0f, 5.0f);
     pmath::Mat4 projLeft = createOffsetProjectionMatrix(
         aspect, fov, nearP, farP, -halfEye, stereo.convergence);
 
-    // Prawe oko: kamera przesunięta w prawo (world x = +halfEye)
+    // Prawe oko
     pmath::Mat4 viewRight;
     viewRight.shift(-halfEye, 0.0f, 5.0f);
     pmath::Mat4 projRight = createOffsetProjectionMatrix(
         aspect, fov, nearP, farP, +halfEye, stereo.convergence);
 
-    // Pass 1: lewe oko → FBO[0]
+    // lewe oko - FBO[0]
     glBindFramebuffer(GL_FRAMEBUFFER, stereoFBO[0]);
     glViewport(0, 0, displayW, displayH);
     renderSceneGeometry(scene, sceneModel, viewLeft, projLeft,
         displayW, displayH, cursorPos, medianPoint, showMedian);
 
-    // Pass 2: prawe oko → FBO[1]
+    // prawe oko - FBO[1]
     glBindFramebuffer(GL_FRAMEBUFFER, stereoFBO[1]);
     glViewport(0, 0, displayW, displayH);
     renderSceneGeometry(scene, sceneModel, viewRight, projRight,
         displayW, displayH, cursorPos, medianPoint, showMedian);
 
-    // Pass 3: kompozyt → domyślny framebuffer
+    // framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, displayW, displayH);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

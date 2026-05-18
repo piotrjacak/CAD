@@ -2,22 +2,32 @@
 #include "SceneObject.h"
 #include "PointObject.h"
 #include <memory>
+#include <vector>
 
 namespace objects {
 
-class CurveObject : public SceneObject {
+class SurfaceObject : public SceneObject {
 public:
+    enum class Topology { Plane, Cylinder };
+
+    Topology topology = Topology::Plane;
+    int patchesU = 1;
+    int patchesV = 1;
+    int tessLevel = 4;
+    bool showControlMesh = false;
+
     std::vector<std::weak_ptr<PointObject>> controlPoints;
-    bool showPolyline = true;
+    int gridU = 0;
+    int gridV = 0;
 
     using SceneObject::SceneObject;
 
-    void addControlPoint(std::shared_ptr<PointObject> pt);
-    void removeControlPoint(uint32_t ptId);
     pmath::Vec3 getCenter() const override;
+    float getPickRadius() const override { return 1.0f; }
     std::vector<std::weak_ptr<PointObject>>* getControlPointsList() override { return &controlPoints; }
 
 protected:
+    int gridIndex(int u, int v) const;
     std::vector<pmath::Vec3> resolveControlPoints() const;
 };
 

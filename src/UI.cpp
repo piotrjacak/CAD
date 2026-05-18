@@ -8,6 +8,7 @@
 #include "objects/BezierCurveC0.h"
 #include "objects/BezierCurveC2.h"
 #include "objects/InterpolatingCurveC2.h"
+#include "objects/BezierSurfaceC0.h"
 #include <memory>
 #include <string>
 
@@ -30,19 +31,21 @@ UIResult UI::render(Scene& scene,
     ImGui::SetNextWindowSize(ImVec2(panel_width, (float)displayH), ImGuiCond_Always);
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 
-    objects::TorusObject*             selectedTorus    = nullptr;
-    objects::BezierCurveC0*           selectedBezierC0 = nullptr;
-    objects::BezierCurveC2*           selectedBezierC2 = nullptr;
-    objects::InterpolatingCurveC2*    selectedInterpC2 = nullptr;
+    objects::TorusObject*             selectedTorus     = nullptr;
+    objects::BezierCurveC0*           selectedBezierC0  = nullptr;
+    objects::BezierCurveC2*           selectedBezierC2  = nullptr;
+    objects::InterpolatingCurveC2*    selectedInterpC2  = nullptr;
+    objects::BezierSurfaceC0*         selectedSurfaceC0 = nullptr;
     float currentR = default_R, current_r = default_r;
     int currentMeshAcc = default_meshAcc;
 
     for (auto& [id, obj] : scene.objects) {
         if (!obj->isSelected) continue;
-        if (!selectedTorus)    selectedTorus    = dynamic_cast<objects::TorusObject*>(obj.get());
-        if (!selectedBezierC0) selectedBezierC0 = dynamic_cast<objects::BezierCurveC0*>(obj.get());
-        if (!selectedBezierC2) selectedBezierC2 = dynamic_cast<objects::BezierCurveC2*>(obj.get());
-        if (!selectedInterpC2) selectedInterpC2 = dynamic_cast<objects::InterpolatingCurveC2*>(obj.get());
+        if (!selectedTorus)     selectedTorus     = dynamic_cast<objects::TorusObject*>(obj.get());
+        if (!selectedBezierC0)  selectedBezierC0  = dynamic_cast<objects::BezierCurveC0*>(obj.get());
+        if (!selectedBezierC2)  selectedBezierC2  = dynamic_cast<objects::BezierCurveC2*>(obj.get());
+        if (!selectedInterpC2)  selectedInterpC2  = dynamic_cast<objects::InterpolatingCurveC2*>(obj.get());
+        if (!selectedSurfaceC0) selectedSurfaceC0 = dynamic_cast<objects::BezierSurfaceC0*>(obj.get());
     }
     if (selectedTorus) {
         currentR = selectedTorus->R;
@@ -163,6 +166,21 @@ UIResult UI::render(Scene& scene,
     }
     else ImGui::TextDisabled("Select an Interpolating Curve C2 to edit options.");
 
+    // Bezier Surface C0
+    ImGui::Separator();
+    if (selectedSurfaceC0) {
+        ImGui::Text("Selected Bezier Surface C0 Options");
+        const char* topoName =
+            (selectedSurfaceC0->topology == objects::SurfaceObject::Topology::Plane)
+                ? "Plane" : "Cylinder";
+        ImGui::Text("Topology: %s",  topoName);
+        ImGui::Text("Patches U: %d", selectedSurfaceC0->patchesU);
+        ImGui::Text("Patches V: %d", selectedSurfaceC0->patchesV);
+        ImGui::SliderInt("Tessellation",     &selectedSurfaceC0->tessLevel, 1, 64);
+        ImGui::Checkbox ("Show control mesh", &selectedSurfaceC0->showControlMesh);
+    }
+    else ImGui::TextDisabled("Select a Bezier Surface C0 to edit options.");
+
     // Cursor position
     ImGui::Separator();
     ImGui::Text("Cursor position");
@@ -227,6 +245,51 @@ UIResult UI::render(Scene& scene,
                     obj->addControlPoint(pt);
         scene.objects[obj->id] = obj;
     }
+    if (ImGui::Button("Add Bezier Surface C0")) {
+        ImGui::OpenPopup("New Bezier Surface C0");
+    }
+    if (ImGui::BeginPopupModal("New Bezier Surface C0", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::RadioButton("Plane",    &newSurfaceC0_topology, 0);
+        ImGui::SameLine();
+        ImGui::RadioButton("Cylinder", &newSurfaceC0_topology, 1);
+        ImGui::Separator();
+
+        ImGui::InputInt("Patches U", &newSurfaceC0_patchesU);
+        if (newSurfaceC0_patchesU < 1) newSurfaceC0_patchesU = 1;
+        ImGui::InputInt("Patches V", &newSurfaceC0_patchesV);
+        if (newSurfaceC0_patchesV < 1) newSurfaceC0_patchesV = 1;
+
+        if (newSurfaceC0_topology == 0) {
+            ImGui::InputFloat("Width",  &newSurfaceC0_width);
+            ImGui::InputFloat("Height", &newSurfaceC0_height);
+        } else {
+            ImGui::InputFloat("Radius", &newSurfaceC0_radius);
+            ImGui::InputFloat("Height", &newSurfaceC0_cylHeight);
+        }
+
+        ImGui::Separator();
+        if (ImGui::Button("Accept")) {
+            if (newSurfaceC0_topology == 0) {
+                objects::BezierSurfaceC0::createPlane(
+                    scene,
+                    newSurfaceC0_patchesU, newSurfaceC0_patchesV,
+                    newSurfaceC0_width,    newSurfaceC0_height,
+                    pmath::Vec3(cursorX, cursorY, cursorZ));
+            } else {
+                objects::BezierSurfaceC0::createCylinder(
+                    scene,
+                    newSurfaceC0_patchesU, newSurfaceC0_patchesV,
+                    newSurfaceC0_radius,   newSurfaceC0_cylHeight,
+                    pmath::Vec3(cursorX, cursorY, cursorZ));
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 
     // Object list
     ImGui::Separator();
@@ -274,7 +337,7 @@ UIResult UI::render(Scene& scene,
     // Stereo
     ImGui::Separator();
     ImGui::Text("Stereoscopic Rendering");
-    ImGui::Checkbox("Enable Anaglyph (Red-Cyan)", &stereo.enabled);
+    ImGui::Checkbox("Enable Anaglyph", &stereo.enabled);
     if (stereo.enabled) {
         ImGui::SliderFloat("Eye Separation",      &stereo.eyeSep,      0.001f, 0.5f);
         ImGui::SliderFloat("Convergence Distance", &stereo.convergence, 0.5f,  20.0f);

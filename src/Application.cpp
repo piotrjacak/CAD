@@ -57,9 +57,9 @@ int Application::run() {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
     // High res Imgui scaling
-    float scale_factor = 1.5f;
-    ImGui::GetStyle().ScaleAllSizes(scale_factor);
-    io.FontGlobalScale = scale_factor;
+    // float scale_factor = 1.5f;
+    // ImGui::GetStyle().ScaleAllSizes(scale_factor);
+    // io.FontGlobalScale = scale_factor;
 
     renderer.init();
 
