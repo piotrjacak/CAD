@@ -26,4 +26,12 @@ private:
     float newSurfaceC0_height    = 5.0f;
     float newSurfaceC0_radius    = 2.0f;
     float newSurfaceC0_cylHeight = 5.0f;
+
+    int   newSurfaceC2_patchesU  = 1;
+    int   newSurfaceC2_patchesV  = 1;
+    int   newSurfaceC2_topology  = 0;
+    float newSurfaceC2_width     = 5.0f;
+    float newSurfaceC2_height    = 5.0f;
+    float newSurfaceC2_radius    = 2.0f;
+    float newSurfaceC2_cylHeight = 5.0f;
 };

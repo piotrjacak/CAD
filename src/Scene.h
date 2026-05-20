@@ -12,6 +12,7 @@ public:
     int torusCounter = 1, pointCounter = 1;
     int bezierC0Counter = 1, bezierC2Counter = 1, interpC2Counter = 1;
     int bezierSurfaceC0Counter = 1;
+    int bezierSurfaceC2Counter = 1;
 
     std::shared_ptr<objects::SceneObject> findById(uint32_t id) const;
     void deleteSelected();

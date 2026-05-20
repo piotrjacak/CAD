@@ -10,6 +10,8 @@ void Renderer::init() {
                                                "bezierShader.tcs", "bezierShader.tes");
     bezierSurfaceC0Shader = std::make_unique<Shader>("bezierSurface.vs", "bezierSurface.fs",
                                                      "bezierSurfaceC0.tcs", "bezierSurface.tes");
+    bezierSurfaceC2Shader = std::make_unique<Shader>("bezierSurface.vs", "bezierSurface.fs",
+                                                     "bezierSurfaceC2.tcs", "bezierSurface.tes");
     compositeShader = std::make_unique<Shader>("anaglyphComposite.vs", "anaglyphComposite.fs");
 
     compositeShader->use();
@@ -179,6 +181,7 @@ void Renderer::renderSceneGeometry(
     ctx.shaderProgram         = shaderProgram.get();
     ctx.bezierShader          = bezierShader.get();
     ctx.bezierSurfaceC0Shader = bezierSurfaceC0Shader.get();
+    ctx.bezierSurfaceC2Shader = bezierSurfaceC2Shader.get();
     ctx.sharedPointVAO        = pointVAO;
 
     for (auto& [id, obj] : scene.objects)

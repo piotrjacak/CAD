@@ -10,9 +10,6 @@ uniform int orientation;
 
 void main()
 {
-    // isolines emituje linie na y = i / outer[0] dla i = 0..outer[0]-1,
-    // czyli zakres [0, T/(T+1)]. Przeskalowujemy do [0, 1] aby ostatnia
-    // linia trafila dokladnie na krawedz v=1 (lub u=1).
     float T = float(tessLevel);
     float yScaled = gl_TessCoord.y * (T + 1.0) / T;
 

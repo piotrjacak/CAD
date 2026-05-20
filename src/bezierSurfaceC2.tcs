@@ -9,9 +9,27 @@ uniform vec3 screenSize;
 uniform int tessLevel;
 uniform int orientation;
 
+// Conversion Boor -> Bezier
+const float W[16] = float[16](
+    1.0/6.0, 4.0/6.0, 1.0/6.0, 0.0,     // k=0
+    0.0,     4.0/6.0, 2.0/6.0, 0.0,     // k=1
+    0.0,     2.0/6.0, 4.0/6.0, 0.0,     // k=2
+    0.0,     1.0/6.0, 4.0/6.0, 1.0/6.0  // k=3
+);
+
 void main()
 {
-    gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
+    int i_b = gl_InvocationID % 4;  // Bezier column (U)
+    int j_b = gl_InvocationID / 4;  // Bezier row    (V)
+
+    vec3 result = vec3(0.0);
+    for (int j = 0; j < 4; ++j) {
+        for (int i = 0; i < 4; ++i) {
+            float w = W[j_b * 4 + j] * W[i_b * 4 + i];
+            result += w * gl_in[j * 4 + i].gl_Position.xyz;
+        }
+    }
+    gl_out[gl_InvocationID].gl_Position = vec4(result, 1.0);
 
     if (gl_InvocationID == 0)
     {
@@ -25,10 +43,10 @@ void main()
         c2.xy = (c2.xy * 0.5 + 0.5) * screenSize.xy;
         c3.xy = (c3.xy * 0.5 + 0.5) * screenSize.xy;
 
-        float lenU0 = distance(c0.xy, c1.xy); // krawedz v=0
-        float lenU1 = distance(c2.xy, c3.xy); // krawedz v=1
-        float lenV0 = distance(c0.xy, c2.xy); // krawedz u=0
-        float lenV1 = distance(c1.xy, c3.xy); // krawedz u=1
+        float lenU0 = distance(c0.xy, c1.xy);
+        float lenU1 = distance(c2.xy, c3.xy);
+        float lenV0 = distance(c0.xy, c2.xy);
+        float lenV1 = distance(c1.xy, c3.xy);
 
         float lenAlong;
         if (orientation == 0) {

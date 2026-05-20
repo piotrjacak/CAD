@@ -51,6 +51,7 @@ private:
     std::unique_ptr<Shader> cursorShader;
     std::unique_ptr<Shader> bezierShader;
     std::unique_ptr<Shader> bezierSurfaceC0Shader;
+    std::unique_ptr<Shader> bezierSurfaceC2Shader;
     std::unique_ptr<Shader> compositeShader;
 
     unsigned int cursorVAO = 0, cursorVBO = 0, cursorEBO = 0;

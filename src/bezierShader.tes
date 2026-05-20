@@ -16,7 +16,6 @@ void main()
     vec4 p2 = gl_in[2].gl_Position;
     vec4 p3 = gl_in[3].gl_Position;
 
-    // Równanie krzywej Beziera 3 stopnia
     vec4 pos = (it*it*it)*p0 + 3.0*(it*it)*t*p1 + 3.0*it*(t*t)*p2 + (t*t*t)*p3;
     gl_Position = projection * view * model * pos;
 }

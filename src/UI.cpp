@@ -9,6 +9,8 @@
 #include "objects/BezierCurveC2.h"
 #include "objects/InterpolatingCurveC2.h"
 #include "objects/BezierSurfaceC0.h"
+#include "objects/BezierSurfaceC2.h"
+#include "objects/SurfaceObject.h"
 #include <memory>
 #include <string>
 
@@ -31,21 +33,21 @@ UIResult UI::render(Scene& scene,
     ImGui::SetNextWindowSize(ImVec2(panel_width, (float)displayH), ImGuiCond_Always);
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 
-    objects::TorusObject*             selectedTorus     = nullptr;
-    objects::BezierCurveC0*           selectedBezierC0  = nullptr;
-    objects::BezierCurveC2*           selectedBezierC2  = nullptr;
-    objects::InterpolatingCurveC2*    selectedInterpC2  = nullptr;
-    objects::BezierSurfaceC0*         selectedSurfaceC0 = nullptr;
+    objects::TorusObject*             selectedTorus    = nullptr;
+    objects::BezierCurveC0*           selectedBezierC0 = nullptr;
+    objects::BezierCurveC2*           selectedBezierC2 = nullptr;
+    objects::InterpolatingCurveC2*    selectedInterpC2 = nullptr;
+    objects::SurfaceObject*           selectedSurface  = nullptr;
     float currentR = default_R, current_r = default_r;
     int currentMeshAcc = default_meshAcc;
 
     for (auto& [id, obj] : scene.objects) {
         if (!obj->isSelected) continue;
-        if (!selectedTorus)     selectedTorus     = dynamic_cast<objects::TorusObject*>(obj.get());
-        if (!selectedBezierC0)  selectedBezierC0  = dynamic_cast<objects::BezierCurveC0*>(obj.get());
-        if (!selectedBezierC2)  selectedBezierC2  = dynamic_cast<objects::BezierCurveC2*>(obj.get());
-        if (!selectedInterpC2)  selectedInterpC2  = dynamic_cast<objects::InterpolatingCurveC2*>(obj.get());
-        if (!selectedSurfaceC0) selectedSurfaceC0 = dynamic_cast<objects::BezierSurfaceC0*>(obj.get());
+        if (!selectedTorus)    selectedTorus    = dynamic_cast<objects::TorusObject*>(obj.get());
+        if (!selectedBezierC0) selectedBezierC0 = dynamic_cast<objects::BezierCurveC0*>(obj.get());
+        if (!selectedBezierC2) selectedBezierC2 = dynamic_cast<objects::BezierCurveC2*>(obj.get());
+        if (!selectedInterpC2) selectedInterpC2 = dynamic_cast<objects::InterpolatingCurveC2*>(obj.get());
+        if (!selectedSurface)  selectedSurface  = dynamic_cast<objects::SurfaceObject*>(obj.get());
     }
     if (selectedTorus) {
         currentR = selectedTorus->R;
@@ -166,20 +168,22 @@ UIResult UI::render(Scene& scene,
     }
     else ImGui::TextDisabled("Select an Interpolating Curve C2 to edit options.");
 
-    // Bezier Surface C0
+    // Bezier Surface (C0 / C2)
     ImGui::Separator();
-    if (selectedSurfaceC0) {
-        ImGui::Text("Selected Bezier Surface C0 Options");
+    if (selectedSurface) {
+        const char* typeStr =
+            (selectedSurface->getType() == objects::ObjectType::BezierSurfaceC0) ? "C0" : "C2";
+        ImGui::Text("Selected Bezier Surface %s Options", typeStr);
         const char* topoName =
-            (selectedSurfaceC0->topology == objects::SurfaceObject::Topology::Plane)
+            (selectedSurface->topology == objects::SurfaceObject::Topology::Plane)
                 ? "Plane" : "Cylinder";
         ImGui::Text("Topology: %s",  topoName);
-        ImGui::Text("Patches U: %d", selectedSurfaceC0->patchesU);
-        ImGui::Text("Patches V: %d", selectedSurfaceC0->patchesV);
-        ImGui::SliderInt("Tessellation",     &selectedSurfaceC0->tessLevel, 1, 64);
-        ImGui::Checkbox ("Show control mesh", &selectedSurfaceC0->showControlMesh);
+        ImGui::Text("Patches U: %d", selectedSurface->patchesU);
+        ImGui::Text("Patches V: %d", selectedSurface->patchesV);
+        ImGui::SliderInt("Tessellation",     &selectedSurface->tessLevel, 1, 64);
+        ImGui::Checkbox ("Show control mesh", &selectedSurface->showControlMesh);
     }
-    else ImGui::TextDisabled("Select a Bezier Surface C0 to edit options.");
+    else ImGui::TextDisabled("Select a Bezier Surface to edit options.");
 
     // Cursor position
     ImGui::Separator();
@@ -286,6 +290,53 @@ UIResult UI::render(Scene& scene,
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Add Bezier Surface C2")) {
+        ImGui::OpenPopup("New Bezier Surface C2");
+    }
+    if (ImGui::BeginPopupModal("New Bezier Surface C2", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::RadioButton("Plane##C2",    &newSurfaceC2_topology, 0);
+        ImGui::SameLine();
+        ImGui::RadioButton("Cylinder##C2", &newSurfaceC2_topology, 1);
+        ImGui::Separator();
+
+        ImGui::InputInt("Patches U##C2", &newSurfaceC2_patchesU);
+        if (newSurfaceC2_patchesU < 1) newSurfaceC2_patchesU = 1;
+        ImGui::InputInt("Patches V##C2", &newSurfaceC2_patchesV);
+        if (newSurfaceC2_patchesV < 1) newSurfaceC2_patchesV = 1;
+
+        if (newSurfaceC2_topology == 0) {
+            ImGui::InputFloat("Width##C2",  &newSurfaceC2_width);
+            ImGui::InputFloat("Height##C2", &newSurfaceC2_height);
+        } else {
+            ImGui::InputFloat("Radius##C2",     &newSurfaceC2_radius);
+            ImGui::InputFloat("Height##C2-cyl", &newSurfaceC2_cylHeight);
+        }
+
+        ImGui::Separator();
+        if (ImGui::Button("Accept##C2")) {
+            if (newSurfaceC2_topology == 0) {
+                objects::BezierSurfaceC2::createPlane(
+                    scene,
+                    newSurfaceC2_patchesU, newSurfaceC2_patchesV,
+                    newSurfaceC2_width,    newSurfaceC2_height,
+                    pmath::Vec3(cursorX, cursorY, cursorZ));
+            } else {
+                objects::BezierSurfaceC2::createCylinder(
+                    scene,
+                    newSurfaceC2_patchesU, newSurfaceC2_patchesV,
+                    newSurfaceC2_radius,   newSurfaceC2_cylHeight,
+                    pmath::Vec3(cursorX, cursorY, cursorZ));
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel##C2")) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

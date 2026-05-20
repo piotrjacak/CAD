@@ -1,4 +1,4 @@
-#include "BezierSurfaceC0.h"
+#include "BezierSurfaceC2.h"
 #include "PointObject.h"
 #include "../Scene.h"
 #include "../shader.h"
@@ -7,10 +7,10 @@
 
 namespace objects {
 
-BezierSurfaceC0::BezierSurfaceC0(uint32_t id, std::string name)
+BezierSurfaceC2::BezierSurfaceC2(uint32_t id, std::string name)
     : SurfaceObject(id, std::move(name)) {}
 
-void BezierSurfaceC0::updateGPUBuffers() {
+void BezierSurfaceC2::updateGPUBuffers() {
     std::vector<pmath::Vec3> pts = resolveControlPoints();
     if (pts.empty() || gridU == 0 || gridV == 0) {
         needsUpdate = false;
@@ -54,8 +54,8 @@ void BezierSurfaceC0::updateGPUBuffers() {
         for (int pi = 0; pi < patchesU; ++pi) {
             for (int b = 0; b < 4; ++b) {
                 for (int a = 0; a < 4; ++a) {
-                    int u = 3 * pi + a;
-                    int v = 3 * pj + b;
+                    int u = pi + a;
+                    int v = pj + b;
                     patchIdx.push_back(static_cast<unsigned int>(gridIndex(u, v)));
                 }
             }
@@ -81,7 +81,7 @@ void BezierSurfaceC0::updateGPUBuffers() {
     needsUpdate = false;
 }
 
-void BezierSurfaceC0::render(const RenderContext& ctx) {
+void BezierSurfaceC2::render(const RenderContext& ctx) {
     if (VAO == 0 || patchIndexCount == 0) return;
 
     pmath::Mat4 model = ctx.sceneModel;
@@ -94,36 +94,36 @@ void BezierSurfaceC0::render(const RenderContext& ctx) {
         ctx.shaderProgram->setMat4("model",      model);
         ctx.shaderProgram->setMat4("view",       ctx.view);
         ctx.shaderProgram->setMat4("projection", ctx.projection);
-        ctx.shaderProgram->setVec3("uColor", 0.8f, 0.8f, 0.2f);
+        ctx.shaderProgram->setVec3("uColor", 0.2f, 0.6f, 0.8f);
         glDrawElements(GL_LINES, meshLineIndexCount, GL_UNSIGNED_INT, (void*)0);
     }
 
     // Surface (patches)
-    if (ctx.bezierSurfaceC0Shader) {
-        ctx.bezierSurfaceC0Shader->use();
-        ctx.bezierSurfaceC0Shader->setMat4("model",      model);
-        ctx.bezierSurfaceC0Shader->setMat4("view",       ctx.view);
-        ctx.bezierSurfaceC0Shader->setMat4("projection", ctx.projection);
-        ctx.bezierSurfaceC0Shader->setVec3("screenSize",
+    if (ctx.bezierSurfaceC2Shader) {
+        ctx.bezierSurfaceC2Shader->use();
+        ctx.bezierSurfaceC2Shader->setMat4("model",      model);
+        ctx.bezierSurfaceC2Shader->setMat4("view",       ctx.view);
+        ctx.bezierSurfaceC2Shader->setMat4("projection", ctx.projection);
+        ctx.bezierSurfaceC2Shader->setVec3("screenSize",
             pmath::Vec3((float)ctx.displayW, (float)ctx.displayH, 0.0f));
-        ctx.bezierSurfaceC0Shader->setInt("tessLevel", tessLevel);
-        if (isSelected) ctx.bezierSurfaceC0Shader->setVec3("uColor", 0.7f, 0.8f, 1.0f);
-        else            ctx.bezierSurfaceC0Shader->setVec3("uColor", 1.0f, 1.0f, 1.0f);
+        ctx.bezierSurfaceC2Shader->setInt("tessLevel", tessLevel);
+        if (isSelected) ctx.bezierSurfaceC2Shader->setVec3("uColor", 0.7f, 0.8f, 1.0f);
+        else            ctx.bezierSurfaceC2Shader->setVec3("uColor", 1.0f, 1.0f, 1.0f);
 
         glPatchParameteri(GL_PATCH_VERTICES, 16);
         void* patchOffset = (void*)(static_cast<size_t>(meshLineIndexCount) * sizeof(unsigned int));
 
-        ctx.bezierSurfaceC0Shader->setInt("orientation", 0);
+        ctx.bezierSurfaceC2Shader->setInt("orientation", 0);
         glDrawElements(GL_PATCHES, patchIndexCount, GL_UNSIGNED_INT, patchOffset);
 
-        ctx.bezierSurfaceC0Shader->setInt("orientation", 1);
+        ctx.bezierSurfaceC2Shader->setInt("orientation", 1);
         glDrawElements(GL_PATCHES, patchIndexCount, GL_UNSIGNED_INT, patchOffset);
     }
 
     glBindVertexArray(0);
 }
 
-std::shared_ptr<BezierSurfaceC0> BezierSurfaceC0::createPlane(
+std::shared_ptr<BezierSurfaceC2> BezierSurfaceC2::createPlane(
     Scene& scene,
     int patchesU, int patchesV,
     float width, float height,
@@ -132,27 +132,27 @@ std::shared_ptr<BezierSurfaceC0> BezierSurfaceC0::createPlane(
     if (patchesU < 1) patchesU = 1;
     if (patchesV < 1) patchesV = 1;
 
-    auto surface = std::make_shared<BezierSurfaceC0>(
+    auto surface = std::make_shared<BezierSurfaceC2>(
         scene.nextId++,
-        "Bezier Surface C0 " + std::to_string(scene.bezierSurfaceC0Counter++));
+        "Bezier Surface C2 " + std::to_string(scene.bezierSurfaceC2Counter++));
 
     surface->topology = Topology::Plane;
     surface->patchesU = patchesU;
     surface->patchesV = patchesV;
-    surface->gridU = 3 * patchesU + 1;
-    surface->gridV = 3 * patchesV + 1;
+    surface->gridU = patchesU + 3;
+    surface->gridV = patchesV + 3;
     surface->controlPoints.reserve(static_cast<size_t>(surface->gridU) * surface->gridV);
 
-    const float halfW = width * 0.5f;
+    const float xStep = width  / static_cast<float>(patchesU);
+    const float zStep = height / static_cast<float>(patchesV);
+    const float halfW = width  * 0.5f;
     const float halfH = height * 0.5f;
 
     for (int v = 0; v < surface->gridV; ++v) {
         for (int u = 0; u < surface->gridU; ++u) {
-            float fx = static_cast<float>(u) / static_cast<float>(surface->gridU - 1);
-            float fz = static_cast<float>(v) / static_cast<float>(surface->gridV - 1);
-            float x = origin.x - halfW + fx * width;
+            float x = origin.x - halfW + (u - 1) * xStep;
             float y = origin.y;
-            float z = origin.z - halfH + fz * height;
+            float z = origin.z - halfH + (v - 1) * zStep;
 
             auto pt = std::make_shared<PointObject>(
                 scene.nextId++,
@@ -169,7 +169,7 @@ std::shared_ptr<BezierSurfaceC0> BezierSurfaceC0::createPlane(
     return surface;
 }
 
-std::shared_ptr<BezierSurfaceC0> BezierSurfaceC0::createCylinder(
+std::shared_ptr<BezierSurfaceC2> BezierSurfaceC2::createCylinder(
     Scene& scene,
     int patchesU, int patchesV,
     float radius, float height,
@@ -178,27 +178,27 @@ std::shared_ptr<BezierSurfaceC0> BezierSurfaceC0::createCylinder(
     if (patchesU < 1) patchesU = 1;
     if (patchesV < 1) patchesV = 1;
 
-    auto surface = std::make_shared<BezierSurfaceC0>(
+    auto surface = std::make_shared<BezierSurfaceC2>(
         scene.nextId++,
-        "Bezier Surface C0 " + std::to_string(scene.bezierSurfaceC0Counter++));
+        "Bezier Surface C2 " + std::to_string(scene.bezierSurfaceC2Counter++));
 
     surface->topology = Topology::Cylinder;
     surface->patchesU = patchesU;
     surface->patchesV = patchesV;
-    surface->gridU = 3 * patchesU;           // cyclic U
-    surface->gridV = 3 * patchesV + 1;
+    surface->gridU = patchesU;            // cyclic, no margin in U for cylinder
+    surface->gridV = patchesV + 3;
     surface->controlPoints.reserve(static_cast<size_t>(surface->gridU) * surface->gridV);
 
     const float halfH = height * 0.5f;
     const float twoPi = 6.28318530717958647692f;
+    const float zStep = height / static_cast<float>(patchesV);
 
     for (int v = 0; v < surface->gridV; ++v) {
         for (int u = 0; u < surface->gridU; ++u) {
             float theta = twoPi * static_cast<float>(u) / static_cast<float>(surface->gridU);
-            float fz = static_cast<float>(v) / static_cast<float>(surface->gridV - 1);
             float x = origin.x + radius * std::cos(theta);
             float y = origin.y + radius * std::sin(theta);
-            float z = origin.z - halfH + fz * height;
+            float z = origin.z - halfH + (v - 1) * zStep;
 
             auto pt = std::make_shared<PointObject>(
                 scene.nextId++,
