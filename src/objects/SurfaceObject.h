@@ -26,6 +26,9 @@ public:
     float getPickRadius() const override { return 1.0f; }
     std::vector<std::weak_ptr<PointObject>>* getControlPointsList() override { return &controlPoints; }
 
+    // Control point at grid (u,v)
+    std::shared_ptr<PointObject> controlPointAt(int u, int v) const;
+
 protected:
     int gridIndex(int u, int v) const;
     std::vector<pmath::Vec3> resolveControlPoints() const;

@@ -10,8 +10,6 @@ std::shared_ptr<objects::SceneObject> Scene::findById(uint32_t id) const {
 }
 
 void Scene::deleteSelected() {
-    // 1. Kandydaci do usuniecia: wszystkie zaznaczone obiekty + punkty kontrolne
-    //    zaznaczonych powierzchni.
     std::set<uint32_t> candidates;
     for (auto& [id, obj] : objects)
         if (obj->isSelected) candidates.insert(id);
@@ -25,8 +23,6 @@ void Scene::deleteSelected() {
                     candidates.insert(pt->id);
     }
 
-    // 2. Filtrujemy: punkt z ownerSurfaceId != 0 mozemy usunac TYLKO wtedy,
-    //    gdy jego owner tez jest na liscie do usuniecia.
     std::set<uint32_t> toRemove;
     for (uint32_t id : candidates) {
         auto it = objects.find(id);
@@ -38,7 +34,14 @@ void Scene::deleteSelected() {
         toRemove.insert(id);
     }
 
-    // 3. Czyscimy referencje weak_ptr w krzywych, a potem usuwamy obiekty.
+    // Remove Gregory fills that reference any removed control point (avoid dangling).
+    for (auto& [id, obj] : objects) {
+        if (obj->getType() != objects::ObjectType::GregoryFill || toRemove.count(id)) continue;
+        if (auto* cps = obj->getControlPointsList())
+            for (auto& wp : *cps)
+                if (auto p = wp.lock(); p && toRemove.count(p->id)) { toRemove.insert(id); break; }
+    }
+
     for (uint32_t removedId : toRemove) {
         for (auto& [id, obj] : objects)
             if (auto* c = dynamic_cast<objects::CurveObject*>(obj.get()))
@@ -52,4 +55,42 @@ std::vector<std::shared_ptr<objects::SceneObject>> Scene::getSelected() const {
     for (auto& [id, obj] : objects)
         if (obj->isSelected) result.push_back(obj);
     return result;
+}
+
+bool Scene::collapsePoints(uint32_t idA, uint32_t idB) {
+    if (idA == idB) return false;
+
+    auto itA = objects.find(idA);
+    auto itB = objects.find(idB);
+    if (itA == objects.end() || itB == objects.end()) return false;
+
+    auto ptA = std::dynamic_pointer_cast<objects::PointObject>(itA->second);
+    auto ptB = std::dynamic_pointer_cast<objects::PointObject>(itB->second);
+    if (!ptA || !ptB) return false;
+
+    // Median position
+    float ax = ptA->transform.m[0][3], ay = ptA->transform.m[1][3], az = ptA->transform.m[2][3];
+    float bx = ptB->transform.m[0][3], by = ptB->transform.m[1][3], bz = ptB->transform.m[2][3];
+    ptA->transform.m[0][3] = 0.5f * (ax + bx);
+    ptA->transform.m[1][3] = 0.5f * (ay + by);
+    ptA->transform.m[2][3] = 0.5f * (az + bz);
+    ptA->needsUpdate = true;
+
+    // Repoint references to idB onto ptA
+    for (auto& [id, obj] : objects) {
+        auto* cps = obj->getControlPointsList();
+        if (!cps) continue;
+        bool affected = false;
+        for (auto& wp : *cps) {
+            auto p = wp.lock();
+            if (!p) continue;
+            if (p->id == idB)      { wp = ptA; affected = true; }
+            else if (p->id == idA) { affected = true; }
+        }
+        if (affected) obj->needsUpdate = true;
+    }
+
+    // Delete the second point
+    objects.erase(idB);
+    return true;
 }

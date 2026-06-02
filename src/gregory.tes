@@ -1,0 +1,50 @@
+#version 400 core
+
+layout (isolines, equal_spacing, ccw) in;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform int tessLevel;
+uniform int orientation;
+
+// 20 control points: indices 0..15 form a 4x4 grid (index = v*4 + u); the four
+// interior points (5,6,9,10) are the "a" variants, with "b" variants in 16..19.
+// Each interior point uses the rational Gregory blend toward its nearest corner.
+vec3 gp(int i) { return gl_in[i].gl_Position.xyz; }
+
+void main()
+{
+    float T = float(tessLevel);
+    float yScaled = gl_TessCoord.y * (T + 1.0) / T;
+
+    float u, v;
+    if (orientation == 0) { u = gl_TessCoord.x; v = yScaled; }
+    else                  { u = yScaled;        v = gl_TessCoord.x; }
+
+    const float eps = 1e-5;
+    vec3 P[16];
+    P[0]  = gp(0);  P[1]  = gp(1);  P[2]  = gp(2);  P[3]  = gp(3);
+    P[4]  = gp(4);                                   P[7]  = gp(7);
+    P[8]  = gp(8);                                   P[11] = gp(11);
+    P[12] = gp(12); P[13] = gp(13); P[14] = gp(14); P[15] = gp(15);
+
+    // Rational Gregory blend of the doubled interior twist points.
+    P[5]  = (u * gp(5)  + v * gp(16))           / max(u + v, eps);
+    P[6]  = ((1.0 - u) * gp(6)  + v * gp(17))   / max((1.0 - u) + v, eps);
+    P[9]  = (u * gp(9)  + (1.0 - v) * gp(18))   / max(u + (1.0 - v), eps);
+    P[10] = ((1.0 - u) * gp(10) + (1.0 - v) * gp(19)) / max((1.0 - u) + (1.0 - v), eps);
+
+    float iu = 1.0 - u, iv = 1.0 - v;
+    float Bu[4];
+    Bu[0] = iu * iu * iu; Bu[1] = 3.0 * iu * iu * u; Bu[2] = 3.0 * iu * u * u; Bu[3] = u * u * u;
+    float Bv[4];
+    Bv[0] = iv * iv * iv; Bv[1] = 3.0 * iv * iv * v; Bv[2] = 3.0 * iv * v * v; Bv[3] = v * v * v;
+
+    vec3 pos = vec3(0.0);
+    for (int j = 0; j < 4; ++j)
+        for (int i = 0; i < 4; ++i)
+            pos += Bu[i] * Bv[j] * P[j * 4 + i];
+
+    gl_Position = projection * view * model * vec4(pos, 1.0);
+}

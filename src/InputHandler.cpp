@@ -3,6 +3,22 @@
 #include "objects/PointObject.h"
 #include "objects/BezierCurveC2.h"
 #include "imgui/imgui.h"
+#include <set>
+
+namespace {
+// Flag every object (other than the one being moved) that references any of the given control points
+void flagDependents(Scene& scene, const std::vector<std::weak_ptr<objects::PointObject>>& pts) {
+    std::set<uint32_t> ids;
+    for (auto& wp : pts)
+        if (auto p = wp.lock()) ids.insert(p->id);
+    for (auto& [id, obj] : scene.objects) {
+        if (obj->needsUpdate) continue;
+        if (auto* cps = obj->getControlPointsList())
+            for (auto& wp : *cps)
+                if (auto p = wp.lock(); p && ids.count(p->id)) { obj->needsUpdate = true; break; }
+    }
+}
+} // namespace
 
 void InputHandler::onScroll(double yoffset) {
     ImGuiIO& io = ImGui::GetIO();
@@ -114,6 +130,7 @@ void InputHandler::onCursorPos(double xpos, double ypos, Scene& scene) {
 
         for (auto& [id, obj] : scene.objects) {
             if (!obj->isSelected) continue;
+            if (obj->getType() == objects::ObjectType::GregoryFill) continue; // not transformable
             pmath::Vec3 pivot;
             if (CURRENT_PIVOT == PivotType::Local)
                 pivot = pmath::Vec3(obj->initialTransform.m[0][3], obj->initialTransform.m[1][3], obj->initialTransform.m[2][3]);
@@ -129,6 +146,7 @@ void InputHandler::onCursorPos(double xpos, double ypos, Scene& scene) {
                     if (auto pt = wp.lock())
                         pt->transform = delta * pt->initialTransform;
                 obj->needsUpdate = true;
+                flagDependents(scene, *cps);
             }
             else if (obj->getType() == objects::ObjectType::Point) {
                 for (auto& [cid, c] : scene.objects)
@@ -150,6 +168,7 @@ void InputHandler::onCursorPos(double xpos, double ypos, Scene& scene) {
 
         for (auto& [id, obj] : scene.objects) {
             if (!obj->isSelected) continue;
+            if (obj->getType() == objects::ObjectType::GregoryFill) continue; // not transformable
             pmath::Vec3 pivot;
             if (CURRENT_PIVOT == PivotType::Local)
                 pivot = pmath::Vec3(obj->initialTransform.m[0][3], obj->initialTransform.m[1][3], obj->initialTransform.m[2][3]);
@@ -168,6 +187,7 @@ void InputHandler::onCursorPos(double xpos, double ypos, Scene& scene) {
                     if (auto pt = wp.lock())
                         pt->transform = delta * pt->initialTransform;
                 obj->needsUpdate = true;
+                flagDependents(scene, *cps);
             }
             else if (obj->getType() == objects::ObjectType::Point) {
                 for (auto& [cid, c] : scene.objects)
@@ -196,6 +216,7 @@ void InputHandler::onCursorPos(double xpos, double ypos, Scene& scene) {
 
         for (auto& [id, obj] : scene.objects) {
             if (!obj->isSelected) continue;
+            if (obj->getType() == objects::ObjectType::GregoryFill) continue; // not transformable
 
             auto* c2 = dynamic_cast<objects::BezierCurveC2*>(obj.get());
             if (c2 && !c2->isBsplineBasis && c2->selectedVirtualPointIndex != -1) {
@@ -223,6 +244,7 @@ void InputHandler::onCursorPos(double xpos, double ypos, Scene& scene) {
                     if (auto pt = wp.lock(); pt && !pt->isSelected)
                         pt->transform = delta * pt->initialTransform;
                 obj->needsUpdate = true;
+                flagDependents(scene, *cps);
             }
             else if (obj->getType() == objects::ObjectType::Point) {
                 for (auto& [cid, c] : scene.objects)

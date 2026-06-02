@@ -11,7 +11,7 @@ namespace objects {
 
 class PointObject;
 
-enum class ObjectType { Torus, Point, BezierCurveC0, BezierCurveC2, InterpolatingCurveC2, BezierSurfaceC0, BezierSurfaceC2 };
+enum class ObjectType { Torus, Point, BezierCurveC0, BezierCurveC2, InterpolatingCurveC2, BezierSurfaceC0, BezierSurfaceC2, GregoryFill };
 
 struct RenderContext {
     pmath::Mat4 sceneModel;
@@ -23,6 +23,7 @@ struct RenderContext {
     Shader* bezierShader = nullptr;
     Shader* bezierSurfaceC0Shader = nullptr;
     Shader* bezierSurfaceC2Shader = nullptr;
+    Shader* gregoryShader = nullptr;
     unsigned int sharedPointVAO = 0;
 };
 

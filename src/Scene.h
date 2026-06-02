@@ -13,8 +13,11 @@ public:
     int bezierC0Counter = 1, bezierC2Counter = 1, interpC2Counter = 1;
     int bezierSurfaceC0Counter = 1;
     int bezierSurfaceC2Counter = 1;
+    int gregoryCounter = 1;
 
     std::shared_ptr<objects::SceneObject> findById(uint32_t id) const;
     void deleteSelected();
     std::vector<std::shared_ptr<objects::SceneObject>> getSelected() const;
+
+    bool collapsePoints(uint32_t idA, uint32_t idB);
 };

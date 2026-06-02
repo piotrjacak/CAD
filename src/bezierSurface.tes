@@ -38,8 +38,7 @@ void main()
     Bv[2] = 3.0 * iv * v  * v;
     Bv[3] = v  * v  * v;
 
-    // Ewaluacja P(u,v) = sum_{i,j} Bu_i * Bv_j * P_{i,j}
-    // Layout: gl_in[j * 4 + i] gdzie i = U (kolumna), j = V (wiersz).
+    // Ewaluacja P(u,v)
     vec4 pos = vec4(0.0);
     for (int j = 0; j < 4; ++j) {
         for (int i = 0; i < 4; ++i) {

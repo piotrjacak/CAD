@@ -3,6 +3,7 @@
 #include "Scene.h"
 #include "InputHandler.h"
 #include "StereoParams.h"
+#include <string>
 
 struct UIResult {
     bool screenCursorChanged = false;

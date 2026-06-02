@@ -22,7 +22,7 @@ void main()
         p1.xy = (p1.xy * 0.5 + 0.5) * screenSize.xy;
         p2.xy = (p2.xy * 0.5 + 0.5) * screenSize.xy;
         p3.xy = (p3.xy * 0.5 + 0.5) * screenSize.xy;
-h
+
         float len = distance(p0.xy, p1.xy) + distance(p1.xy, p2.xy) + distance(p2.xy, p3.xy);
 
         float tessLevel = clamp(len, 1.0, 64.0);

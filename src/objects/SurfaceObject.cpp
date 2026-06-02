@@ -10,6 +10,12 @@ int SurfaceObject::gridIndex(int u, int v) const {
     return v * gridU + u;
 }
 
+std::shared_ptr<PointObject> SurfaceObject::controlPointAt(int u, int v) const {
+    int idx = gridIndex(u, v);
+    if (idx < 0 || idx >= static_cast<int>(controlPoints.size())) return nullptr;
+    return controlPoints[idx].lock();
+}
+
 std::vector<pmath::Vec3> SurfaceObject::resolveControlPoints() const {
     std::vector<pmath::Vec3> pts;
     pts.reserve(controlPoints.size());

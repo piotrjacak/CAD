@@ -11,8 +11,10 @@
 #include "objects/BezierSurfaceC0.h"
 #include "objects/BezierSurfaceC2.h"
 #include "objects/SurfaceObject.h"
+#include "objects/GregoryFillSurface.h"
 #include <memory>
 #include <string>
+#include <vector>
 
 UIResult UI::render(Scene& scene,
                     float& cursorX, float& cursorY, float& cursorZ,
@@ -38,6 +40,7 @@ UIResult UI::render(Scene& scene,
     objects::BezierCurveC2*           selectedBezierC2 = nullptr;
     objects::InterpolatingCurveC2*    selectedInterpC2 = nullptr;
     objects::SurfaceObject*           selectedSurface  = nullptr;
+    objects::GregoryFillSurface*      selectedGregory  = nullptr;
     float currentR = default_R, current_r = default_r;
     int currentMeshAcc = default_meshAcc;
 
@@ -47,7 +50,9 @@ UIResult UI::render(Scene& scene,
         if (!selectedBezierC0) selectedBezierC0 = dynamic_cast<objects::BezierCurveC0*>(obj.get());
         if (!selectedBezierC2) selectedBezierC2 = dynamic_cast<objects::BezierCurveC2*>(obj.get());
         if (!selectedInterpC2) selectedInterpC2 = dynamic_cast<objects::InterpolatingCurveC2*>(obj.get());
-        if (!selectedSurface)  selectedSurface  = dynamic_cast<objects::SurfaceObject*>(obj.get());
+        if (!selectedGregory)  selectedGregory  = dynamic_cast<objects::GregoryFillSurface*>(obj.get());
+        if (!selectedSurface && obj->getType() != objects::ObjectType::GregoryFill)
+            selectedSurface = dynamic_cast<objects::SurfaceObject*>(obj.get());
     }
     if (selectedTorus) {
         currentR = selectedTorus->R;
@@ -184,6 +189,15 @@ UIResult UI::render(Scene& scene,
         ImGui::Checkbox ("Show control mesh", &selectedSurface->showControlMesh);
     }
     else ImGui::TextDisabled("Select a Bezier Surface to edit options.");
+
+    // Gregory fill
+    ImGui::Separator();
+    if (selectedGregory) {
+        ImGui::Text("Selected Gregory Fill Options");
+        ImGui::SliderInt("Subdivisions##greg",  &selectedGregory->tessLevel, 1, 64);
+        ImGui::Checkbox ("Show continuity vectors##greg", &selectedGregory->showContinuityVectors);
+    }
+    else ImGui::TextDisabled("Select a Gregory Fill to edit options.");
 
     // Cursor position
     ImGui::Separator();
@@ -340,6 +354,26 @@ UIResult UI::render(Scene& scene,
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
+    }
+
+    // Fill a 3-sided hole
+    if (ImGui::Button("Fill hole (Gregory)")) {
+        objects::GregoryFillSurface::createFromSelection(scene);
+    }
+
+    // Point operations
+    ImGui::Separator();
+    {
+        std::vector<uint32_t> selectedPointIds;
+        for (auto& [id, obj] : scene.objects)
+            if (obj->isSelected && obj->getType() == objects::ObjectType::Point)
+                selectedPointIds.push_back(id);
+        if (selectedPointIds.size() == 2) {
+            if (ImGui::Button("Collapse points"))
+                scene.collapsePoints(selectedPointIds[0], selectedPointIds[1]);
+        } else {
+            ImGui::TextDisabled("Select exactly 2 points to collapse.");
+        }
     }
 
     // Object list
