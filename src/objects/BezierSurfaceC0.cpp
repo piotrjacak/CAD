@@ -33,14 +33,15 @@ void BezierSurfaceC0::updateGPUBuffers() {
 
     // Meshline indices (GL_LINES)
     std::vector<unsigned int> meshLineIdx;
-    const int uMax = (topology == Topology::Cylinder) ? gridU : gridU - 1;
+    const int uMax = (topology == Topology::Cylinder && wrapAxis == WrapAxis::U) ? gridU : gridU - 1;
+    const int vMax = (topology == Topology::Cylinder && wrapAxis == WrapAxis::V) ? gridV : gridV - 1;
     for (int v = 0; v < gridV; ++v) {
         for (int u = 0; u < uMax; ++u) {
             meshLineIdx.push_back(static_cast<unsigned int>(gridIndex(u,     v)));
             meshLineIdx.push_back(static_cast<unsigned int>(gridIndex(u + 1, v)));
         }
     }
-    for (int v = 0; v < gridV - 1; ++v) {
+    for (int v = 0; v < vMax; ++v) {
         for (int u = 0; u < gridU; ++u) {
             meshLineIdx.push_back(static_cast<unsigned int>(gridIndex(u, v)));
             meshLineIdx.push_back(static_cast<unsigned int>(gridIndex(u, v + 1)));

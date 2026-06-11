@@ -4,8 +4,9 @@
 namespace objects {
 
 int SurfaceObject::gridIndex(int u, int v) const {
-    if (topology == Topology::Cylinder && gridU > 0) {
-        u = ((u % gridU) + gridU) % gridU;
+    if (topology == Topology::Cylinder) {
+        if (wrapAxis == WrapAxis::U && gridU > 0) u = ((u % gridU) + gridU) % gridU;
+        if (wrapAxis == WrapAxis::V && gridV > 0) v = ((v % gridV) + gridV) % gridV;
     }
     return v * gridU + u;
 }

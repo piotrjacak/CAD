@@ -8,9 +8,6 @@ uniform mat4 projection;
 uniform int tessLevel;
 uniform int orientation;
 
-// 20 control points: indices 0..15 form a 4x4 grid (index = v*4 + u); the four
-// interior points (5,6,9,10) are the "a" variants, with "b" variants in 16..19.
-// Each interior point uses the rational Gregory blend toward its nearest corner.
 vec3 gp(int i) { return gl_in[i].gl_Position.xyz; }
 
 void main()
@@ -29,7 +26,6 @@ void main()
     P[8]  = gp(8);                                   P[11] = gp(11);
     P[12] = gp(12); P[13] = gp(13); P[14] = gp(14); P[15] = gp(15);
 
-    // Rational Gregory blend of the doubled interior twist points.
     P[5]  = (u * gp(5)  + v * gp(16))           / max(u + v, eps);
     P[6]  = ((1.0 - u) * gp(6)  + v * gp(17))   / max((1.0 - u) + v, eps);
     P[9]  = (u * gp(9)  + (1.0 - v) * gp(18))   / max(u + (1.0 - v), eps);

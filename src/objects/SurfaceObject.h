@@ -9,8 +9,10 @@ namespace objects {
 class SurfaceObject : public SceneObject {
 public:
     enum class Topology { Plane, Cylinder };
+    enum class WrapAxis { U, V };
 
     Topology topology = Topology::Plane;
+    WrapAxis wrapAxis = WrapAxis::U;
     int patchesU = 1;
     int patchesV = 1;
     int tessLevel = 4;

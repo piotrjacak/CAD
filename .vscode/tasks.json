@@ -27,7 +27,8 @@
                 "kernel32.lib",
                 "user32.lib",
                 "gdi32.lib",
-                "shell32.lib"
+                "shell32.lib",
+                "comdlg32.lib"
             ],
             "group": {
                 "kind": "build",

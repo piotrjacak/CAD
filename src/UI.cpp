@@ -12,6 +12,8 @@
 #include "objects/BezierSurfaceC2.h"
 #include "objects/SurfaceObject.h"
 #include "objects/GregoryFillSurface.h"
+#include "SceneIO.h"
+#include "FileDialog.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -61,6 +63,19 @@ UIResult UI::render(Scene& scene,
     }
 
     ImGui::Begin("Options", nullptr, window_flags);
+
+    // Scene file
+    if (ImGui::Button("Save Scene")) {
+        std::string path = filedialog::saveFile();
+        if (!path.empty()) sceneio::save(scene, path);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Load Scene")) {
+        std::string path = filedialog::openFile();
+        if (!path.empty() && sceneio::load(scene, path))
+            for (auto& [id, obj] : scene.objects) obj->needsUpdate = true;
+    }
+    ImGui::Separator();
 
     // Torus parameters
     if (selectedTorus) {

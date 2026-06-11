@@ -24,7 +24,7 @@ pmath::Vec3 pointPos(const std::shared_ptr<PointObject>& p) {
     return pmath::Vec3(p->transform.m[0][3], p->transform.m[1][3], p->transform.m[2][3]);
 }
 
-// de Casteljau split of a cubic at t=0.5 into two cubics L (first half) and R (second half).
+// de Casteljau split of a cubic at t=0.5 into two cubics L (first half) and R (second half)
 void splitCubic(const std::array<pmath::Vec3, 4>& b,
                 std::array<pmath::Vec3, 4>& L,
                 std::array<pmath::Vec3, 4>& R) {
@@ -192,41 +192,41 @@ void GregoryFillSurface::computePatches() {
 
     using pmath::Vec3;
 
-    // Resolve boundary (B) and inner (C) rows of each hole edge.
+    // Get boundary (B) and inner (C) rows of each hole edge.
     std::array<std::array<Vec3, 4>, 3> B, C;
     for (int k = 0; k < 3; ++k)
         for (int i = 0; i < 4; ++i) {
             auto pb  = holeEdges[k].boundary[i].lock();
             auto pin = holeEdges[k].inner[i].lock();
-            if (!pb || !pin) return;   // a referenced surface was deleted -> hide
+            if (!pb || !pin) return;
             B[k][i] = pointPos(pb);
             C[k][i] = pointPos(pin);
         }
 
-    // Split each boundary/inner cubic at the midpoint.
+    // Split each boundary/inner cubic at the midpoint
     std::array<std::array<Vec3, 4>, 3> Lb, Rb, Lc, Rc;
     for (int k = 0; k < 3; ++k) { splitCubic(B[k], Lb[k], Rb[k]); splitCubic(C[k], Lc[k], Rc[k]); }
 
     Vec3 mid[3];
-    for (int k = 0; k < 3; ++k) mid[k] = Lb[k][3];           // = Rb[k][0]
+    for (int k = 0; k < 3; ++k) mid[k] = Lb[k][3];
     Vec3 center = (mid[0] + mid[1] + mid[2]) * (1.0f / 3.0f);
 
-    // Internal cubic from each midpoint to the centre (straight for now).
+    // Internal cubic from each midpoint to the centre
     std::array<std::array<Vec3, 4>, 3> IN;
     for (int k = 0; k < 3; ++k) {
         Vec3 d = center - mid[k];
         IN[k] = {mid[k], mid[k] + d * (1.0f / 3.0f), mid[k] + d * (2.0f / 3.0f), center};
     }
 
-    // Build one Gregory patch per shared corner (between edge k and edge k+1).
+    // Build one Gregory patch per shared corner
     for (int k = 0; k < 3; ++k) {
         int kn = (k + 1) % 3;
-        const auto& vb  = Rb[k];   // v=0 row: mid_k -> corner (2nd half of edge k)
-        const auto& ub  = Lb[kn];  // u=3 col: corner -> mid_{k+1} (1st half of edge k+1)
+        const auto& vb  = Rb[k];   // v=0 row: mid_k -> corner
+        const auto& ub  = Lb[kn];  // u=3 col: corner -> mid_{k+1}
         const auto& in0 = IN[k];   // u=0 col: mid_k -> centre
         std::array<Vec3, 4> v3 = {IN[kn][3], IN[kn][2], IN[kn][1], IN[kn][0]}; // v=3 row: centre -> mid_{k+1}
 
-        // Mirror inner rows across the boundary -> C1/G1 with the Bezier patches.
+        // Mirror inner rows across the boundary -> C1 with the Bezier patches.
         std::array<Vec3, 4> MRb, MLb;
         for (int i = 0; i < 4; ++i) {
             MRb[i] = Rb[k][i] * 2.0f - Rc[k][i];
@@ -234,28 +234,24 @@ void GregoryFillSurface::computePatches() {
         }
 
         std::array<Vec3, 20> P;
-        // 4x4 grid (index = v*4 + u), edges:
+
         P[0] = vb[0];  P[1] = vb[1];  P[2] = vb[2];  P[3] = vb[3];   // v=0 (outer)
         P[4] = in0[1]; P[7] = ub[1];                                 // v=1 ends
         P[8] = in0[2]; P[11] = ub[2];                                // v=2 ends
         P[12] = v3[0]; P[13] = v3[1]; P[14] = v3[2]; P[15] = v3[3];  // v=3 (internal)
 
-        // Interior "a" variants (grid) + "b" variants (extras 16..19):
-        // active on outer edges -> mirror; active on internal edges -> zero-twist.
-        P[5]  = MRb[1];                          // (1,1) a: v=0 mirror
-        P[16] = vb[1] + in0[1] - vb[0];          // (1,1) b: zero-twist
-        P[6]  = MRb[2];                          // (2,1) a: v=0 mirror
-        P[17] = MLb[1];                          // (2,1) b: u=3 mirror
-        P[9]  = v3[1] + in0[2] - v3[0];          // (1,2) a: zero-twist
-        P[18] = v3[1] + in0[2] - v3[0];          // (1,2) b: zero-twist
-        P[10] = v3[2] + ub[2] - v3[3];           // (2,2) a: zero-twist
-        P[19] = MLb[2];                          // (2,2) b: u=3 mirror
+        P[5]  = MRb[1];                          // (1,1) a
+        P[16] = vb[1] + in0[1] - vb[0];          // (1,1) b
+        P[6]  = MRb[2];                          // (2,1) a
+        P[17] = MLb[1];                          // (2,1) b
+        P[9]  = v3[1] + in0[2] - v3[0];          // (1,2) a
+        P[18] = v3[1] + in0[2] - v3[0];          // (1,2) b
+        P[10] = v3[2] + ub[2] - v3[3];           // (2,2) a
+        P[19] = MLb[2];                          // (2,2) b
 
         patches.push_back(P);
 
-        // Continuity segments: inner Bezier point -> boundary -> mirrored Gregory
-        // point. Collinear by construction, so each segment shows the matching
-        // cross-boundary derivative (G1) across the two outer edges.
+        // Continuity segments: inner Bezier point -> boundary -> mirrored Gregory point. 
         for (int i = 0; i < 4; ++i) {
             continuityPts.push_back(Rc[k][i]);  continuityPts.push_back(MRb[i]);
             continuityPts.push_back(Lc[kn][i]); continuityPts.push_back(MLb[i]);
@@ -289,7 +285,7 @@ void GregoryFillSurface::updateGPUBuffers() {
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
 
-    // Continuity vectors (separate VAO/VBO, drawn as GL_LINES).
+    // Continuity vectors
     if (contVAO == 0) { glGenVertexArrays(1, &contVAO); glGenBuffers(1, &contVBO); }
     glBindVertexArray(contVAO);
     glBindBuffer(GL_ARRAY_BUFFER, contVBO);

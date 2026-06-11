@@ -16,6 +16,9 @@ public:
     int gregoryCounter = 1;
 
     std::shared_ptr<objects::SceneObject> findById(uint32_t id) const;
+    void clear();
+    // After loading: set nextId past the largest id and reset name counters.
+    void normalizeIdsAfterLoad();
     void deleteSelected();
     std::vector<std::shared_ptr<objects::SceneObject>> getSelected() const;
 

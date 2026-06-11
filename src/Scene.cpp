@@ -9,6 +9,43 @@ std::shared_ptr<objects::SceneObject> Scene::findById(uint32_t id) const {
     return it != objects.end() ? it->second : nullptr;
 }
 
+void Scene::clear() {
+    objects.clear();
+    nextId = 1;
+    torusCounter = pointCounter = 1;
+    bezierC0Counter = bezierC2Counter = interpC2Counter = 1;
+    bezierSurfaceC0Counter = bezierSurfaceC2Counter = 1;
+    gregoryCounter = 1;
+}
+
+void Scene::normalizeIdsAfterLoad() {
+    uint32_t maxId = 0;
+    int nTorus = 0, nPoint = 0, nC0 = 0, nC2 = 0, nInterp = 0;
+    int nSurfC0 = 0, nSurfC2 = 0, nGregory = 0;
+    for (auto& [id, obj] : objects) {
+        if (id > maxId) maxId = id;
+        switch (obj->getType()) {
+            case objects::ObjectType::Torus:                ++nTorus;   break;
+            case objects::ObjectType::Point:                ++nPoint;   break;
+            case objects::ObjectType::BezierCurveC0:        ++nC0;      break;
+            case objects::ObjectType::BezierCurveC2:        ++nC2;      break;
+            case objects::ObjectType::InterpolatingCurveC2: ++nInterp;  break;
+            case objects::ObjectType::BezierSurfaceC0:      ++nSurfC0;  break;
+            case objects::ObjectType::BezierSurfaceC2:      ++nSurfC2;  break;
+            case objects::ObjectType::GregoryFill:          ++nGregory; break;
+        }
+    }
+    nextId = maxId + 1;
+    torusCounter = nTorus + 1;
+    pointCounter = nPoint + 1;
+    bezierC0Counter = nC0 + 1;
+    bezierC2Counter = nC2 + 1;
+    interpC2Counter = nInterp + 1;
+    bezierSurfaceC0Counter = nSurfC0 + 1;
+    bezierSurfaceC2Counter = nSurfC2 + 1;
+    gregoryCounter = nGregory + 1;
+}
+
 void Scene::deleteSelected() {
     std::set<uint32_t> candidates;
     for (auto& [id, obj] : objects)
